@@ -1,0 +1,1027 @@
+# Hyprland + Noctalia User Manual
+
+A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedora 43, built from this machine's actual configuration. Use the table of contents to jump to topics — each section is self-contained.
+
+---
+
+## Table of Contents
+
+1. [System Overview](#1-system-overview)
+2. [Quick Cheat Sheet](#2-quick-cheat-sheet)
+3. [Daily Workflow](#3-daily-workflow)
+4. [Hyprland Keybindings — Full Reference](#4-hyprland-keybindings--full-reference)
+5. [Window Management](#5-window-management)
+6. [Workspaces](#6-workspaces)
+7. [The Noctalia Shell](#7-the-noctalia-shell)
+8. [Application Launcher](#8-application-launcher)
+9. [Terminal: kitty + bash + atuin + ble.sh](#9-terminal-kitty--bash--atuin--blesh)
+10. [Files & File Manager](#10-files--file-manager)
+11. [Browser (Brave)](#11-browser-brave)
+12. [Wallpapers (Wallcards Plugin)](#12-wallpapers-wallcards-plugin)
+13. [Screenshots & Screen Recording](#13-screenshots--screen-recording)
+14. [Workspace Overview (Super+A)](#14-workspace-overview-supera)
+15. [Lock Screen, Idle, Lid](#15-lock-screen-idle-lid)
+16. [Sound, Audio, Media Keys](#16-sound-audio-media-keys)
+17. [Display, Scaling, Fonts](#17-display-scaling-fonts)
+18. [Power Management](#18-power-management)
+19. [Battery Charge Limit (80%)](#19-battery-charge-limit-80)
+20. [Settings UIs You Can Use](#20-settings-uis-you-can-use)
+21. [Package Management — RPM, DNF, Flatpak](#21-package-management--rpm-dnf-flatpak)
+22. [Updating the System](#22-updating-the-system)
+23. [The fastfetch Splash](#23-the-fastfetch-splash)
+24. [Profile Manager (Snapshots & Backup)](#24-profile-manager-snapshots--backup)
+25. [Customizing — Adding Keybinds, Window Rules, Autostarts](#25-customizing--adding-keybinds-window-rules-autostarts)
+26. [Troubleshooting](#26-troubleshooting)
+27. [File & Path Reference](#27-file--path-reference)
+28. [Glossary](#28-glossary)
+29. [Useful Links & Where to Learn More](#29-useful-links--where-to-learn-more)
+
+---
+
+## 1. System Overview
+
+| Layer | Component | Where it lives |
+|---|---|---|
+| OS | Fedora 43 Workstation | — |
+| Kernel | Linux 6.19.x | — |
+| Display server | Wayland | — |
+| Compositor (window manager) | **Hyprland** 0.54.x | `~/.config/hypr/` |
+| Desktop shell (top bar, launcher, lock, tray) | **Noctalia** (`qs -c noctalia-shell`) | `/etc/xdg/quickshell/noctalia-shell/`, user overrides in `~/.config/noctalia/` |
+| Workspace overview tool | `quickshell -c overview` | `~/.config/quickshell/overview/` |
+| Screenshot tool | `quickshell -c HyprQuickFrame` | `~/.config/quickshell/HyprQuickFrame/` |
+| Default terminal | **kitty** | `~/.config/kitty/` |
+| Default shell | **bash** with `ble.sh` + `atuin` | `~/.bashrc`, `~/.blerc`, `~/.config/atuin/` |
+| Browser | **Brave** | system; user-level desktop entry at `~/.local/share/applications/brave-browser.desktop` |
+| File manager | **Dolphin** (KDE) | system |
+| Audio backend | PipeWire | system |
+| Audio post-processor | EasyEffects | autostarted |
+
+**Mental model:** Hyprland is the engine that draws windows. Noctalia is the GUI on top — top bar, launcher, lock screen, settings panel. They are separate processes; if the bar disappears, Noctalia died (Hyprland is still fine).
+
+---
+
+## 2. Quick Cheat Sheet
+
+The 30 things you'll use most. **`Super`** is the Windows / Command key.
+
+| Action | Key |
+|---|---|
+| Open app launcher | `Super+Space` (or `Alt+Space`) |
+| Open terminal | `Super+Return` |
+| Open browser | `Super+Z` |
+| Open file manager | `Super+E` |
+| Close focused window | `Super+Q` |
+| Force-kill stuck window | `Super+Shift+Q` |
+| Toggle floating ↔ tiled | `Super+W` |
+| Fullscreen | `Super+F` |
+| Move floating window | hold `Super` + left-click and drag |
+| Resize floating window | hold `Super` + right-click and drag |
+| Switch focus (arrow keys) | `Super+←/→/↑/↓` (or `h/j/k/l`) |
+| Move window | `Super+Shift+←/→/↑/↓` |
+| Resize tiled window | `Super+Alt+←/→/↑/↓` |
+| Switch workspace | `Super+1` … `Super+9`, `Super+0` |
+| Move window to workspace | `Super+Shift+1` … `Super+Shift+0` |
+| **Workspace overview (grid view)** | `Super+A` |
+| Toggle scratchpad (special workspace) | `Super+\`` |
+| **Lock screen** | `Super+O` |
+| Session menu (logout / reboot / shutdown) | `Alt+F4` |
+| Hide / show top bar | `Super+Shift+W` |
+| Color picker | `Super+C` |
+| Toggle wallpaper picker | `Super+Y` |
+| Take a screenshot | `PrintScreen` |
+| Annotate after screenshot | `Shift+PrintScreen` |
+| Clipboard history | `Super+V` |
+| Wipe clipboard | `Super+Shift+V` |
+| Emoji picker | `Super+.` |
+| Volume up / down / mute | `XF86AudioRaise/Lower/Mute` |
+| Brightness up / down | `XF86MonBrightnessUp/Down` |
+| Switch keyboard layout (US ↔ TR) | `Alt+Shift` |
+
+---
+
+## 3. Daily Workflow
+
+A worked example for a typical session:
+
+1. **Login** → Hyprland starts, Noctalia paints the bar/wallpaper, Brave opens silently on workspace 1, a kitty drops into the special workspace, EasyEffects starts in the tray. fastfetch runs in any new kitty.
+2. **Open the launcher** with `Super+Space`. Type to filter, Enter to launch. Click an icon directly with the mouse.
+3. **Switch between apps** with `Super+1`…`9` (workspaces) or use `Super+A` for a grid overview where you can click any window thumbnail.
+4. **Multi-task on one workspace** — open two apps, they tile side-by-side. Press `Super+W` to make one float. Drag with `Super+leftclick` to position.
+5. **Lock & walk away** — `Super+O`. Or close the lid: it locks automatically and turns the screen off.
+6. **End of day** — `Alt+F4` opens the session menu (logout / restart / shutdown).
+
+---
+
+## 4. Hyprland Keybindings — Full Reference
+
+All keybinds are in `~/.config/hypr/configs/keybinds.conf` (system) and `~/.config/hypr/configs/user-overrides.conf` (yours). To add or change one, edit the file and run `hyprctl reload`.
+
+### 4.1 Hyprland (compositor) actions
+
+| Key | Action |
+|---|---|
+| `Super+Q` | Close active window |
+| `Super+Shift+Q` | Force-kill (sends SIGKILL) |
+| `Super+W` | Toggle floating |
+| `Super+P` | Pseudotile mode |
+| `Super+I` | Toggle split direction |
+| `Super+F` | Maximize (fill-monitor) |
+| `Super+Shift+F` | Real fullscreen (covers bar) |
+| `Super+\`` | Toggle special (scratchpad) workspace |
+| `Super+Shift+\`` | Move active window to special workspace |
+| `Super+F1` | Toggle animations on/off |
+| `Super+Shift+P` | Pin window (visible on every workspace) |
+
+### 4.2 Window groups (tabbed window grouping)
+
+| Key | Action |
+|---|---|
+| `Super+G` | Group / ungroup focused window |
+| `Super+Shift+G` | Lock active group |
+| `Super+Tab` | Next window in group |
+| `Super+Shift+Tab` | Previous window in group |
+| `Super+Ctrl+H/J/K/L` | Move window into group on left/down/up/right |
+| `Super+D` | Move window out of its group |
+
+### 4.3 Launchers
+
+| Key | Action |
+|---|---|
+| `Super+Return` | Terminal (kitty) |
+| `Super+E` | File manager (Dolphin) |
+| `Alt+Space` / `Super+Space` | Application launcher |
+| `Super+R` | Alt launcher (rofi `drun`) |
+| `Super+Z` | Browser (Brave) |
+| `Super+O` | Lock screen |
+
+### 4.4 Tools
+
+| Key | Action |
+|---|---|
+| `Super+C` | Color picker (Hyprpicker) — copies hex to clipboard |
+| `Super+Y` | Wallpaper picker (Wallcards) |
+| `PrintScreen` | Region screenshot (HyprQuickFrame) |
+| `Shift+PrintScreen` | Annotate the just-captured screenshot |
+| `Super+V` | Clipboard history (Noctalia) |
+| `Super+Shift+V` | Wipe clipboard |
+| `Super+.` | Emoji picker |
+| `Alt+F4` | Session menu (lock/sleep/shutdown/logout/reboot) |
+| `Super+Shift+W` | Toggle Noctalia bar visibility |
+| `Super+A` | Workspace overview grid |
+
+### 4.5 Window focus & movement
+
+| Key | Action |
+|---|---|
+| `Super+←/→/↑/↓` or `Super+H/J/K/L` | Move focus |
+| `Super+Shift+←/→/↑/↓` or `Super+Shift+H/J/K/L` | Move window |
+| `Super+Alt+←/→/↑/↓` or `Super+Alt+H/J/K/L` | Resize tiled window (70 px steps) |
+
+### 4.6 Workspaces
+
+| Key | Action |
+|---|---|
+| `Super+1` … `Super+9`, `Super+0` | Switch to workspace 1–10 |
+| `Super+Shift+1` … `Super+Shift+0` | Move active window to workspace |
+| `Super+Ctrl+1` … `Super+Ctrl+0` | Move window to workspace silently (no auto-switch) |
+
+### 4.7 Lid switch (laptop)
+
+| Action | Behavior |
+|---|---|
+| Close lid | Lock screen + display off |
+| Open lid | Display on (lock screen still showing) |
+
+---
+
+## 5. Window Management
+
+Hyprland is a **tiling** compositor. New windows automatically slot in next to the existing one, splitting the available space. You can opt windows out with floating mode.
+
+### 5.1 Tiled mode (default)
+
+- Windows split the screen automatically.
+- `Super+I` toggles whether the next split is horizontal or vertical.
+- `Super+Alt+arrow` resizes the focused tile by 70 px.
+
+### 5.2 Floating mode
+
+- Press `Super+W` to lift the focused window out of the tile grid.
+- Hold `Super` and **left-click-drag** to move it.
+- Hold `Super` and **right-click-drag** to resize.
+- `Super+W` again to put it back into the tile grid.
+
+### 5.3 Make a specific app always float
+
+Add to `~/.config/hypr/configs/user-overrides.conf`:
+
+```hyprland
+windowrulev2 = float, class:^(kitty)$
+windowrulev2 = size 900 600, class:^(kitty)$
+windowrulev2 = center, class:^(kitty)$
+```
+
+Find the class name with `hyprctl clients` while the app is open — look for the `class:` field.
+
+### 5.4 Group multiple windows into a tab stack
+
+`Super+G` turns the focused window into a "group". Drop more windows into the group with `Super+Ctrl+H/J/K/L`. Switch tabs with `Super+Tab` / `Super+Shift+Tab`.
+
+### 5.5 Pin a window across workspaces
+
+`Super+Shift+P` keeps a floating window visible on every workspace.
+
+---
+
+## 6. Workspaces
+
+You have 10 numbered workspaces (1–10) plus a special "scratchpad" workspace.
+
+- `Super+N` switches to workspace N.
+- `Super+Shift+N` moves the focused window to N.
+- `Super+\`` toggles the scratchpad — a hidden workspace that floats over whatever you're doing. Great for a persistent notepad or terminal.
+- `Super+A` opens the **overview** — a clickable 3×3 grid of all workspaces with live thumbnails. Drag a window from one cell to another to relocate it.
+
+Initial autostart layout (configured in `~/.config/hypr/configs/user-overrides.conf`):
+
+- Workspace 1: Brave (silently launched at login)
+- Special workspace: kitty (silently launched at login)
+
+---
+
+## 7. The Noctalia Shell
+
+Noctalia is the desktop shell — top bar, launcher, control center, lock screen, notifications, OSD, plugin host. It's the QML-based UI you see *around* the windows.
+
+### 7.1 The top bar
+
+- Click the icons to open Noctalia panels (calendar, weather, clipboard, etc.).
+- The cookie-clock plugin (top-right) is a Noctalia plugin.
+- Hide/show with `Super+Shift+W`.
+
+### 7.2 Control Center (settings panel)
+
+Open it via the gear icon in the bar. From there you can configure:
+
+- Bar layout (modules, position, density, transparency)
+- Plugins (enable / disable / configure)
+- Themes (color scheme)
+- Wallpaper (rotation, slot, monitor mapping)
+- Keybindings (map shell-internal actions to keys)
+
+### 7.3 If Noctalia crashes
+
+You'll lose the bar and wallpaper. Restart with:
+
+```bash
+systemctl --user reset-failed noctalia-shell
+systemd-run --user --unit=noctalia-shell --property=Restart=on-failure qs -c noctalia-shell
+```
+
+This wraps Noctalia in a systemd user unit so it auto-restarts on failure.
+
+To kill it manually:
+
+```bash
+systemctl --user stop noctalia-shell
+# or
+pkill -x qs
+```
+
+### 7.4 Plugins enabled here
+
+| Plugin | Purpose | Bound to |
+|---|---|---|
+| `wallcards` | Animated wallpaper picker | `Super+Y` |
+| `cookie-clock` | Pixel-art clock widget | top-right of bar |
+| `screen-toolkit` | Screenshot annotation | `Shift+PrintScreen` |
+
+Plugins live at `~/.config/noctalia/plugins/` and `/usr/share/noctalia-plugins/`.
+
+---
+
+## 8. Application Launcher
+
+Press `Super+Space` (or `Alt+Space`).
+
+- **Type** to fuzzy-filter installed apps.
+- **Up/Down** to navigate, **Enter** to launch.
+- **Esc** to close.
+- The list is built from `.desktop` files in `/usr/share/applications/` and `~/.local/share/applications/`.
+
+To make an app appear in the launcher, drop a `foo.desktop` file into `~/.local/share/applications/`. The launcher picks it up next time you open it.
+
+To **hide** a stock app from the launcher, copy its system desktop file to `~/.local/share/applications/` and add `NoDisplay=true`.
+
+To **change a launcher entry's command** (e.g., to add CLI flags), copy its `.desktop` from `/usr/share/applications/` to `~/.local/share/applications/` and edit the `Exec=` lines. The user copy overrides the system one. We did this for Brave to remove a force-scale flag.
+
+---
+
+## 9. Terminal: kitty + bash + atuin + ble.sh
+
+### 9.1 kitty itself
+
+- Launch with `Super+Return`.
+- Font: JetBrainsMono Nerd Font 12pt — change in `~/.config/kitty/kitty.conf`.
+- `Ctrl+Plus` / `Ctrl+Minus` / `Ctrl+0` resize font on the fly.
+- `PageUp` / `PageDown` to scroll.
+- 80% transparency by default (`background_opacity 0.8`).
+
+### 9.2 bash + ble.sh (line editor with autosuggestions)
+
+ble.sh adds:
+
+- **Inline autosuggestion (ghost text):** as you type, the most likely command from your history appears in grey after the cursor. Press `→` (right arrow) or `End` to accept it.
+- **Syntax highlighting** while typing.
+- Tab still does stock-bash completion (lists matches first press, cycles second press) — we deliberately kept that classic feel.
+
+Config is at `~/.blerc`. Toggle features by editing `bleopt complete_auto_complete=...` lines.
+
+### 9.3 atuin (history search)
+
+atuin replaces the dumb stock bash history with a searchable database. You'll see it via:
+
+- **`Ctrl+R`** → small dropdown at the bottom of the screen with fuzzy history search. Type to filter, arrows to navigate, Enter to run.
+- Up arrow on the prompt is **not** atuin — that's stock bash previous-history. Atuin only fires on `Ctrl+R`.
+
+First-time setup (do this once):
+
+```bash
+atuin import bash    # imports your existing ~/.bash_history
+atuin stats          # shows your most-used commands
+```
+
+If you want history to sync between machines (optional), `atuin register` creates a free sync account. Local-only is the default — totally fine.
+
+Atuin config: `~/.config/atuin/config.toml`. We use `style = "compact"` for the small dropdown look.
+
+### 9.4 fastfetch
+
+Runs automatically in every new kitty. Shows the Fedora ASCII logo, OS info, kernel, package count, kitty/Hyprland version, and uptime. Config: `~/.config/fastfetch/config.jsonc`.
+
+To skip it for one-off shells: `bash --norc` or set `FASTFETCH_SKIP=1` (would need a small bashrc tweak to honor it).
+
+To remove the splash entirely: edit `~/.bashrc` and remove the `fastfetch` line near the bottom.
+
+---
+
+## 10. Files & File Manager
+
+**Dolphin** is the default. Open with `Super+E`.
+
+Key features used here:
+
+- KDE theme (Inter font, dark, macOS cursor) via `~/.config/kdeglobals`, `~/.config/gtk-3.0/settings.ini`, `~/.config/gtk-4.0/settings.ini`.
+- Built-in tabs, split view (`F3`), preview pane (`F11`), terminal embedded (`F4`).
+
+Other terminal-based file tools you have:
+
+- `ranger` (if installed) — vim-style, three-pane file navigator
+- `cd`, `ls`, `tree` — basics
+
+---
+
+## 11. Browser (Brave)
+
+Brave is the default browser, launched on workspace 1 at login (autostart) and bound to `Super+Z`.
+
+- **Wayland scaling**: Brave runs through XWayland and the compositor handles 1.25× scaling automatically — no `--force-device-scale-factor` flag needed (we removed it).
+- User-level launcher entry: `~/.local/share/applications/brave-browser.desktop` overrides the system file. Add command-line flags to the `Exec=` lines if you need to.
+- Profile data: `~/.config/BraveSoftware/Brave-Browser/`.
+- Handy CLI: `brave-browser --new-window <url>` or `brave-browser --incognito`.
+
+---
+
+## 12. Wallpapers (Wallcards Plugin)
+
+Open with `Super+Y`.
+
+- Wallpapers live in `~/Pictures/Wallpapers/` (set in Noctalia → Settings → Wallpaper → Directory).
+- Three filter tabs: **All**, **Images**, **Videos**.
+- Card carousel — hover with mouse, scroll wheel, or arrow keys to cycle.
+- Click the centered card to apply.
+- Random shuffle button (`R`) reshuffles the deck.
+- Live-preview button (`P`) applies as you hover (heavier on CPU).
+
+### 12.1 Adding wallpapers
+
+**Images** — drop `.png / .jpg / .jpeg` files into `~/Pictures/Wallpapers/`. They'll appear in the Images and All tabs the next time you open Wallcards.
+
+**Videos** — drop `.mp4 / .mkv / .webm / .mov / .avi` files into the same folder. Same drill: open Wallcards (`Super+Y`), click the Videos tab, click any video card to apply.
+
+### 12.2 Video wallpapers (custom feature)
+
+The upstream wallcards plugin had video applying as a TODO. We patched it. Click a video card → it plays as your wallpaper via `mpvpaper`. The video resumes after reboot via `exec-once = ~/.local/bin/wallcards-video restore` in `~/.config/hypr/configs/user-overrides.conf`.
+
+To stop a video and revert to a static image: just click any image card. To check / control manually:
+
+```bash
+~/.local/bin/wallcards-video status            # what's currently playing
+~/.local/bin/wallcards-video set eDP-1 /path/to/video.mp4
+~/.local/bin/wallcards-video clear
+```
+
+State is at `~/.local/state/wallcards-video.state`.
+
+**Important:** the patched plugin invokes the helper at its absolute path `/home/ldzbeta/.local/bin/wallcards-video` because Noctalia's environment may have a minimal `PATH`. If you ever move the helper, update both occurrences in `~/.config/noctalia/plugins/wallcards/WallcardsWindow.qml`.
+
+**Caveat:** matugen color extraction uses the current wallpaper *image*, so the color theme doesn't auto-update from videos. Apply an image once first to establish a palette, then apply a video.
+
+---
+
+## 13. Screenshots & Screen Recording
+
+- `PrintScreen` → region selector via **HyprQuickFrame** (Quickshell-based). Screenshots save to `~/Pictures/Screenshots/`.
+- `Shift+PrintScreen` → annotate the most recent capture (Noctalia screen-toolkit plugin).
+
+For a screen recorder, install `wf-recorder`:
+
+```bash
+sudo dnf install wf-recorder
+wf-recorder -g "$(slurp)" -f ~/Videos/recording.mp4   # region recording
+```
+
+Or use OBS Studio (`sudo dnf install obs-studio`) for streaming/recording.
+
+---
+
+## 14. Workspace Overview (Super+A)
+
+A 3×3 grid of all 9 workspaces with live thumbnails plus a special-workspace row.
+
+- **Click** any cell → switch to that workspace.
+- **Drag a window thumbnail** between cells → moves the window to that workspace.
+- **`Super+A`** again to close.
+
+The overview is a separate quickshell process (`quickshell -c overview`). If `Super+A` does nothing:
+
+```bash
+pkill -f "quickshell -c overview"
+quickshell -c overview &
+```
+
+Config: `~/.config/quickshell/overview/`.
+
+---
+
+## 15. Lock Screen, Idle, Lid
+
+| Trigger | Behavior |
+|---|---|
+| `Super+O` | Lock immediately (Noctalia lock screen) |
+| Close laptop lid | Lock + screen off |
+| Open lid | Screen on, lock prompt visible |
+| `Alt+F4` | Session menu (lock / sleep / shutdown / logout / reboot) |
+
+If you want **idle auto-lock** (e.g., lock after 5 minutes idle), `hypridle` is installed but not configured. Tell me to set it up — it's a 30-second config file.
+
+---
+
+## 16. Sound, Audio, Media Keys
+
+- Volume up/down/mute and brightness work via the standard `XF86Audio*` / `XF86MonBrightness*` keys.
+- Audio backend: PipeWire. **EasyEffects** is autostarted in the tray for system-wide EQ / compression / noise suppression.
+- Per-app volume mixer: install `pavucontrol` (`sudo dnf install pavucontrol`).
+- Media playback control (Spotify, browser, players): `XF86AudioPlay/Pause/Next/Prev` work (bound to `playerctl`).
+
+---
+
+## 17. Display, Scaling, Fonts
+
+### 17.1 Monitor scaling
+
+Set in `~/.config/hypr/monitors.conf`:
+
+```hyprland
+monitor=eDP-1,1920x1200@120,0x0,1.25
+monitor=,preferred,auto,1.25
+```
+
+Last value (`1.25`) is the scale. `1.25` ≈ Windows' default 125% on a HiDPI laptop. Change to `1.5` for bigger, `1` for native. Run `hyprctl reload` after editing.
+
+For a GUI: `nwg-displays` (install with `sudo dnf install nwg-displays`).
+
+### 17.2 Natural scrolling (Mac/Windows-style)
+
+Enabled in `~/.config/hypr/configs/user-overrides.conf` under the `input` block:
+
+```hyprland
+input {
+    natural_scroll = true
+    touchpad {
+        natural_scroll = true
+    }
+}
+```
+
+Both the mouse wheel and the touchpad now scroll content with your fingers (drag up to scroll up). To revert, set both to `false` and `hyprctl reload`.
+
+### 17.3 Fonts
+
+Three places, kept consistent at **Inter 9pt** (× 1.25 scale = ~11pt visual, matching Windows defaults):
+
+| App family | File | Setting |
+|---|---|---|
+| GTK 3 apps | `~/.config/gtk-3.0/settings.ini` | `gtk-font-name=Inter 9` |
+| GTK 4 apps | `~/.config/gtk-4.0/settings.ini` | `gtk-font-name=Inter 9` |
+| KDE / Qt apps | `~/.config/kdeglobals` | `[General] font=Inter,9,...` |
+| kitty | `~/.config/kitty/kitty.conf` | `font_size 10.0` |
+| GNOME defaults | `gsettings set org.gnome.desktop.interface font-name 'Inter 9'` | (live) |
+| Fontconfig defaults (sans/mono) | `~/.config/fontconfig/fonts.conf` | sans → Inter, mono → JetBrainsMono |
+
+**Existing windows don't reload fonts** — close and reopen the app to see changes.
+
+For Brave's UI specifically: it doesn't read GTK/KDE fonts; it scales with the compositor. If Brave UI feels off, edit `~/.local/share/applications/brave-browser.desktop` and add a `--force-device-scale-factor=1.0` (or `1.1`, `1.5`, etc.) to the `Exec=` lines.
+
+---
+
+## 18. Power Management
+
+Power profiles (Performance / Balanced / Power Saver) are managed by **tuned-ppd** which is already running. Switch with:
+
+```bash
+powerprofilesctl                         # show current
+powerprofilesctl list                    # all available
+powerprofilesctl set power-saver         # battery-friendly
+powerprofilesctl set balanced            # default
+powerprofilesctl set performance         # max
+```
+
+Or via GNOME Control Center → Power. (KDE's `systemsettings` Power panel will say "service not running" because it expects the Plasma daemon `powerdevil` — which we don't run on Hyprland. Use `powerprofilesctl` or GNOME Control Center instead.)
+
+---
+
+## 19. Battery Charge Limit (80%)
+
+Lithium batteries last longer when not regularly topped up to 100%. We set up an 80% limit at the kernel level.
+
+```bash
+sudo charge-limit 80          # enable 80% limit (also the boot default)
+sudo charge-limit 100         # full charge mode (e.g., before travel)
+sudo charge-limit status      # show current limit + charge level
+```
+
+`sudo` doesn't ask for a password — `/etc/sudoers.d/charge-limit` allows passwordless invocation of just this one binary.
+
+**Persistence:** `/etc/tmpfiles.d/charge-limit.conf` writes `80` to the threshold on every boot via systemd-tmpfiles. To change the boot default, edit that file and change `80` to whatever you prefer.
+
+Files involved:
+
+- `/usr/local/bin/charge-limit` — the helper script
+- `/etc/sudoers.d/charge-limit` — passwordless sudo rule
+- `/etc/tmpfiles.d/charge-limit.conf` — boot persistence
+- `/sys/class/power_supply/BAT1/charge_control_end_threshold` — the kernel sysfs file being written
+
+---
+
+## 20. Settings UIs You Can Use
+
+There is no single "Control Panel" on Hyprland the way Windows or macOS has. You mix and match.
+
+| Need | App | How to launch |
+|---|---|---|
+| **Most things (Power, Displays, Keyboard, Online Accounts, Mouse, Sound)** | **GNOME Control Center** | Search "Settings" in the launcher (we wrapped it with `XDG_CURRENT_DESKTOP=GNOME` so panels render outside GNOME) |
+| Bar, plugins, themes, wallpaper rotation, keybindings | Noctalia Control Center | Click the gear icon on the bar |
+| Display layout (multi-monitor) | `nwg-displays` | `nwg-displays` |
+| Per-app sound mixer | `pavucontrol` | `pavucontrol` |
+| Network connections, VPN | `nm-connection-editor` | `nm-connection-editor` |
+| Bluetooth pairing | `blueman-manager` | `blueman-manager` |
+| Audio EQ / noise suppression | `easyeffects` | `easyeffects` |
+| Software install / update | **GNOME Software** | Search "Software" |
+| Power profile | `powerprofilesctl` (CLI) or GNOME Control Center → Power | — |
+| Hyprland-specific config | text editor on `~/.config/hypr/` | `kate ~/.config/hypr/configs/user-overrides.conf` |
+
+`systemsettings` (KDE) is installed but most of its panels expect Plasma daemons that aren't running here. Stick with the table above.
+
+---
+
+## 21. Package Management — RPM, DNF, Flatpak
+
+Fedora has three package systems. Here's when you use each:
+
+| System | What | Where it lives | Command |
+|---|---|---|---|
+| **RPM** (via DNF) | OS packages, system tools | `/usr/`, system-wide | `dnf` |
+| **Flatpak** | Sandboxed GUI apps from Flathub | `/var/lib/flatpak/` and `~/.local/share/flatpak/` | `flatpak` |
+| **AppImage** | Single-binary apps | wherever you put them | run directly |
+
+### 21.1 DNF cheat sheet
+
+```bash
+# Install / update / remove
+sudo dnf install <pkg>
+sudo dnf upgrade                       # update everything
+sudo dnf remove <pkg>
+sudo dnf autoremove                    # clean up unused dependencies
+
+# Search & info
+dnf search <keyword>
+dnf info <pkg>
+rpm -qi <pkg>                          # detailed info on installed package
+
+# Find which package owns a file
+rpm -qf /path/to/file
+
+# What files does a package install?
+rpm -ql <pkg>
+
+# What depends on this package?
+dnf repoquery --whatrequires <pkg>
+
+# What does this package depend on?
+dnf repoquery --requires <pkg>
+
+# What I explicitly installed (vs what was pulled as a dependency)
+dnf repoquery --userinstalled
+
+# Recently installed
+rpm -qa --queryformat '%{INSTALLTIME} %{NAME}\n' | sort -rn | head
+
+# Activity log
+dnf history list
+dnf history info <id>
+
+# Find orphan/leaf packages (nothing depends on them)
+package-cleanup --leaves --quiet
+```
+
+### 21.2 GUI: GNOME Software
+
+The friendliest way. Search "Software" in the launcher. It lists installed apps with screenshots, lets you install/uninstall, manages updates, and supports Flatpak alongside RPM.
+
+To enable Flathub (huge Flatpak repository):
+
+```bash
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+```
+
+Then GNOME Software shows Flathub apps too.
+
+### 21.3 Common cleanup candidates on this system
+
+(Skip any you actually use.)
+
+```bash
+sudo dnf remove firefox                          # ~267 MB — you use Brave
+sudo dnf remove libreoffice-core libreoffice-\*  # ~500-700 MB — only if you don't open .docx/.odt locally
+sudo dnf remove upscayl                          # ~604 MB — image upscaler, only if used
+```
+
+`sudo dnf autoremove` already shows nothing on this system, so there are no orphan dependencies right now.
+
+---
+
+## 22. Updating the System
+
+Run weekly:
+
+```bash
+sudo dnf upgrade --refresh
+flatpak update
+```
+
+Or via GNOME Software's Updates pane. If a kernel was updated, reboot afterwards.
+
+To upgrade across Fedora releases (e.g., 43 → 44):
+
+```bash
+sudo dnf install dnf-plugin-system-upgrade
+sudo dnf system-upgrade download --releasever=44
+sudo dnf system-upgrade reboot
+```
+
+Don't do this casually — read the Fedora release notes first.
+
+---
+
+## 23. The fastfetch Splash
+
+Auto-runs in every new kitty (via `~/.bashrc`). Logo: builtin "Fedora" ASCII (the colorful F-in-diamond). Modules: OS, kernel, packages (rpm count), shell, terminal, wm, uptime, color palette.
+
+Config: `~/.config/fastfetch/config.jsonc`.
+
+To swap the logo:
+
+- Builtin distros: change `"source": "Fedora"` to any from `fastfetch --list-logos` (e.g., `Fedora_small`, `Fedora_old`).
+- Real image (only in kitty/iTerm2): set `"type": "kitty-direct"` and `"source": "/path/to/image.png"`.
+- Custom ASCII art: set `"type": "file"` and `"source": "/path/to/your.txt"`.
+
+---
+
+## 24. Profile Manager (Snapshots & Backup)
+
+You have `~/profile-manager/` with a small bash tool that snapshots your config tree to `~/profile-manager/backups/<label>/`.
+
+Use it before risky changes:
+
+```bash
+~/profile-manager/profile-manager.sh snapshot pre-experiment-$(date +%F)
+```
+
+Listed paths it manages (from `MANAGED_PATHS` in the script):
+
+- `.config/hypr`, `.config/quickshell`, `.config/kitty`, `.config/fuzzel`, `.config/matugen`
+- `.config/gtk-3.0`, `.config/gtk-4.0`, `.config/wlogout`, `.config/illogical-impulse`, `.config/kdeglobals`
+- `.local/bin`, `.local/share/quickshell-lockscreen`
+- `.zshrc`, `.ideavimrc`
+
+To restore from a snapshot, the script has a `switch <label>` subcommand that swaps the current config tree out for the snapshot.
+
+---
+
+## 25. Customizing — Adding Keybinds, Window Rules, Autostarts
+
+All your overrides go in **`~/.config/hypr/configs/user-overrides.conf`**. Editing the system file (`keybinds.conf`) works but gets overwritten on Noctalia/Hyprland updates — overrides survive.
+
+### 25.1 Add a keybind
+
+```hyprland
+# Open Spotify with Super+M
+bind = $mainMod, M, exec, spotify
+
+# Cycle power profiles with Super+F2
+bind = $mainMod, F2, exec, bash -c 'cur=$(powerprofilesctl get); case $cur in power-saver) powerprofilesctl set balanced ;; balanced) powerprofilesctl set performance ;; *) powerprofilesctl set power-saver ;; esac'
+```
+
+After editing: `hyprctl reload`.
+
+### 25.2 Variables
+
+You can re-define `$mainMod`, `$browser`, `$terminal`, etc. in your override file to change app defaults without touching the system file.
+
+### 25.3 Window rules
+
+```hyprland
+windowrulev2 = float, class:^(Calculator)$
+windowrulev2 = workspace 5, class:^(Spotify)$
+windowrulev2 = noborder, class:^(kitty)$
+windowrulev2 = opacity 0.9 0.85, class:^(kitty)$        # focused 90%, blurred 85%
+windowrulev2 = pin, title:^(Picture-in-Picture)$
+```
+
+Find class with `hyprctl clients` while the app is open.
+
+### 25.4 Autostart
+
+```hyprland
+exec-once = nm-applet
+exec-once = blueman-applet
+exec-once = [workspace 3 silent] discord
+exec-once = brave-browser --no-startup-window     # pre-warm Brave so launcher feels instant
+```
+
+`[workspace N silent]` opens the app on workspace N without switching to it.
+
+### 25.5 Environment variables
+
+```hyprland
+env = GDK_SCALE,1
+env = QT_QPA_PLATFORMTHEME,qt6ct
+env = ELECTRON_OZONE_PLATFORM_HINT,wayland
+```
+
+After changing env vars, **fully log out and back in** — `hyprctl reload` does not re-export env vars to running apps.
+
+---
+
+## 25.5 App Launch Performance — Pre-Warming & FD Limits
+
+The launcher → app spawn pipeline has been tuned for snappier launches **without keeping apps resident in RAM**. Three layers of optimization:
+
+### A. Spawn-path tuning (zero RAM cost)
+
+- Quickshell starts with `nofile=524288` (was 1024) so launcher-spawned apps inherit it. Browsers/Electron/Java apps allocate hundreds of FDs and behave more conservatively when constrained.
+- `HyprlandService.spawn` patched to fork apps directly via `Quickshell.execDetached` instead of the `hyprctl dispatch exec` round-trip. Saves ~20–50 ms per launch.
+- `misc:focus_on_activate = true` and `input:focus_on_close = 1` so new windows take focus immediately when the launcher closes.
+
+### B. Adaptive page-cache pre-warm (zero permanent RAM)
+
+A small daemon reads Noctalia's launcher usage stats (`~/.cache/noctalia/shell-state.json` → `launcherUsage`) and pre-loads the install directories of your **top 8 most-used apps with ≥3 launches** into the kernel page cache via `vmtouch -t`. Cache is reclaimable under memory pressure, so cost is effectively zero.
+
+**Tunables in `~/.local/bin/prewarm-apps`:**
+
+```bash
+TOP_N=8           # max apps to cache
+MIN_USES=3        # require this many launches to qualify
+MAX_TOTAL_MB=2000 # hard cap on total cache footprint
+```
+
+**Schedule (systemd user timer):**
+
+- Runs **45 seconds after login** (catches up boot-time cache miss)
+- Re-runs **every 7 days** with 2-minute random jitter (re-evaluates as your habits change)
+
+**Useful commands:**
+
+```bash
+systemctl --user list-timers prewarm-apps.timer       # show next/last run
+systemctl --user start prewarm-apps.service           # re-run immediately
+cat ~/.local/state/prewarm-apps.log                   # see what was selected each run
+systemctl --user disable --now prewarm-apps.timer     # turn it off completely
+```
+
+**Files:**
+
+- `~/.local/bin/prewarm-apps` — selection + vmtouch driver
+- `~/.config/systemd/user/prewarm-apps.service` — oneshot service
+- `~/.config/systemd/user/prewarm-apps.timer` — boot + weekly schedule
+- `~/.local/state/prewarm-apps.log` — run history
+
+### C. Pre-warming heavy apps (optional, costs RAM)
+
+We deliberately skipped pre-warming because it costs ~150–300 MB per resident app. If you ever change your mind, add to `~/.config/hypr/configs/user-overrides.conf`:
+
+```hyprland
+exec-once = brave-browser --no-startup-window
+```
+
+Brave then sits as an idle daemon (~150 MB) and new-window launches from the launcher feel instant. Same pattern works for any Chromium/Electron app that has the flag.
+
+### Honest limits
+
+After all of the above, the dominant cost on a heavy app's first launch is the app's own initialization (Chromium loading shared libs, V8 engine, etc.) — typically 500–1000 ms for Brave/VS Code/Antigravity. Page-cache pre-warm shaves the disk-read portion (~100–300 ms). The only way to make a heavy app **feel instant** is to keep it running, which trades RAM for latency.
+
+---
+
+## 26. Troubleshooting
+
+### 26.1 Top bar is gone / wallpaper gone / black screen
+
+Noctalia died. Recover:
+
+```bash
+systemctl --user reset-failed noctalia-shell
+systemd-run --user --unit=noctalia-shell --property=Restart=on-failure qs -c noctalia-shell
+```
+
+Logs (look for the most recent):
+
+```bash
+ls -t /run/user/$UID/quickshell/by-id/*/log.qslog | head -1 | xargs tail -100
+```
+
+### 26.2 Launcher icons missing or broken
+
+Kill all noctalia and restart it (see above). If still broken, check `~/.config/noctalia/settings.json` for a custom icon theme that might not exist.
+
+### 26.3 An app I installed doesn't appear in the launcher
+
+Refresh the desktop database:
+
+```bash
+update-desktop-database ~/.local/share/applications
+```
+
+Also reopen the launcher (it caches on first open in a session).
+
+### 26.4 Brave UI is too small / too big
+
+Edit `~/.local/share/applications/brave-browser.desktop` and add to the `Exec=` lines:
+
+```
+--force-device-scale-factor=1.25
+```
+
+(`1.0` for smaller, `1.5` for bigger.) Quit and relaunch Brave.
+
+### 26.5 An app refuses to launch from launcher but works in terminal
+
+Often missing env vars. Wrap with `env`:
+
+```
+Exec=env XDG_CURRENT_DESKTOP=GNOME gnome-control-center
+```
+
+We did this for GNOME Control Center because some panels refuse to run outside a GNOME session.
+
+### 26.6 Wallpaper changing isn't reflected in colors
+
+Noctalia's color extraction (matugen) reads the wallpaper image. If you set a video wallpaper, colors won't update — set an image once first to get a color scheme, then apply the video.
+
+### 26.7 fastfetch logo doesn't render image (just shows ASCII)
+
+The image protocol needs kitty (or another supporting terminal). In TTY / SSH / non-image-capable terminals, fastfetch falls back to the builtin ASCII automatically.
+
+### 26.8 Up arrow opens a weird search instead of previous command
+
+That was atuin's default up-arrow binding. We've disabled it (`__atuin_bind_up_arrow=false` in `~/.bashrc`). Use `Ctrl+R` for atuin's history search instead.
+
+### 26.9 Lid-close doesn't lock the screen
+
+Verify the binding:
+
+```bash
+hyprctl binds | grep -A4 "Lid Switch"
+```
+
+If empty, check `~/.config/hypr/configs/user-overrides.conf` has the `bindl = , switch:on:Lid Switch, ...` lines.
+
+### 26.10 Weird permission errors when running graphical commands
+
+Don't run GUI apps with `sudo` — it breaks Wayland authentication. If you really need root for a GUI tool, use `pkexec` instead.
+
+### 26.11 Clicking a video in the wallpaper picker does nothing
+
+Likely the helper script can't be found in Noctalia's `PATH`. Verify:
+
+```bash
+tr '\0' '\n' < /proc/$(pgrep -f "qs -c noctalia-shell" | head -1)/environ | grep ^PATH=
+```
+
+Should include `/home/ldzbeta/.local/bin`. If it doesn't:
+- Check `~/.config/hypr/configs/autostart.conf` — Noctalia is started with `bash -c 'export PATH=...; exec qs -c noctalia-shell'`
+- The wallcards plugin's `applyCard()` uses the absolute path `/home/ldzbeta/.local/bin/wallcards-video` to be safe regardless of PATH
+
+If mpvpaper layer is present (`hyprctl layers | grep mpvpaper`) but you don't see the video, check that Noctalia's wallpaper layer isn't stuck on top — restart the shell:
+
+```bash
+systemctl --user reset-failed noctalia-shell
+systemd-run --user --unit=noctalia-shell --property=Restart=on-failure --property=LimitNOFILE=524288 \
+  bash -c 'export PATH=$HOME/.local/bin:$PATH; exec qs -c noctalia-shell'
+```
+
+### 26.12 Up arrow opens atuin search instead of previous command
+
+Should be fixed already (`__atuin_bind_up_arrow=false` in `~/.bashrc`). Use `Ctrl+R` for atuin's compact search dropdown.
+
+---
+
+## 27. File & Path Reference
+
+| Purpose | Path |
+|---|---|
+| Hyprland main config | `~/.config/hypr/hyprland.conf` |
+| Hyprland keybinds | `~/.config/hypr/configs/keybinds.conf` (system) |
+| **Your Hyprland overrides** | `~/.config/hypr/configs/user-overrides.conf` |
+| Monitor config | `~/.config/hypr/monitors.conf` |
+| Workspace config | `~/.config/hypr/workspaces.conf` |
+| Noctalia user settings | `~/.config/noctalia/settings.json` |
+| Noctalia plugins | `~/.config/noctalia/plugins/` |
+| Noctalia shell (system) | `/etc/xdg/quickshell/noctalia-shell/` |
+| Quickshell overview | `~/.config/quickshell/overview/` |
+| Quickshell screenshot tool | `~/.config/quickshell/HyprQuickFrame/` |
+| Wallcards plugin | `~/.config/noctalia/plugins/wallcards/` |
+| Wallcards video state | `~/.local/state/wallcards-video.state` |
+| kitty config | `~/.config/kitty/kitty.conf` |
+| kitty theme | `~/.config/kitty/current-theme.conf` |
+| bash interactive config | `~/.bashrc` |
+| ble.sh config | `~/.blerc` |
+| atuin config | `~/.config/atuin/config.toml` |
+| atuin database | `~/.local/share/atuin/history.db` |
+| fastfetch config | `~/.config/fastfetch/config.jsonc` |
+| GTK 3 settings | `~/.config/gtk-3.0/settings.ini` |
+| GTK 4 settings | `~/.config/gtk-4.0/settings.ini` |
+| KDE / Qt settings | `~/.config/kdeglobals` |
+| Fontconfig defaults | `~/.config/fontconfig/fonts.conf` |
+| Brave user launcher | `~/.local/share/applications/brave-browser.desktop` |
+| Settings (GNOME CC) launcher | `~/.local/share/applications/org.gnome.Settings.desktop` |
+| Wallpaper directory | `~/Pictures/Wallpapers/` |
+| Screenshots directory | `~/Pictures/Screenshots/` |
+| Custom helpers | `~/.local/bin/` (`charge-limit`, `wallcards-video`, `hyprland-dialog`, `hyprland-guiutils`) |
+| Profile manager | `~/profile-manager/` |
+| Profile snapshots | `~/profile-manager/backups/` |
+| Local user services | `~/.config/systemd/user/` |
+
+---
+
+## 28. Glossary
+
+| Term | Meaning |
+|---|---|
+| **Compositor** | The program that draws windows on screen (Hyprland) |
+| **Wayland** | Modern display-server protocol replacing X11 |
+| **XWayland** | Compatibility layer that lets X11 apps run on Wayland |
+| **Tiling WM** | Window manager that auto-arranges windows in a grid (no overlapping by default) |
+| **Floating window** | A window opted out of the tile grid — you place it manually |
+| **Workspace** | A virtual desktop. You have 10 + a special scratchpad |
+| **Special workspace** | A "scratchpad" workspace toggled with `Super+\``; floats over the current workspace |
+| **Quickshell** | The QML-based shell framework Noctalia is built on |
+| **Layer shell** | Wayland protocol that lets shells draw bars/wallpapers above/below windows |
+| **DPMS** | Display Power Management — turning monitors on/off |
+| **PPD** | Power Profiles Daemon — exposes Performance/Balanced/Power-Saver profiles via DBus |
+| **systemd unit** | A managed service definition. User units live in `~/.config/systemd/user/` |
+| **dotfile** | A config file in your home directory starting with `.` |
+
+---
+
+## 29. Useful Links & Where to Learn More
+
+- Hyprland wiki: https://wiki.hypr.land/
+- Hyprland config reference: https://wiki.hypr.land/Configuring/Variables/
+- Noctalia GitHub: https://github.com/noctalia-dev/noctalia-shell
+- Quickshell docs: https://quickshell.outfoxxed.me/
+- kitty docs: https://sw.kovidgoyal.net/kitty/
+- atuin docs: https://docs.atuin.sh/
+- ble.sh manual: https://github.com/akinomyoga/ble.sh
+- Fedora Magazine (tips & tutorials): https://fedoramagazine.org/
+- Arch Wiki (often the best Linux reference): https://wiki.archlinux.org/
+
+When asking for help on Reddit (`r/hyprland`, `r/Fedora`) or Discord, share:
+
+1. `hyprctl version`
+2. The relevant section of your config
+3. Logs: `journalctl --user -b 0 | tail -100` and `~/.cache/hyprland/hyprland.log`
+
+---
+
+*Last updated: based on the live state of this machine after our setup session. Edit freely as you change things — this file is yours.*

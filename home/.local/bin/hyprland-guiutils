@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Compatibility wrapper: use Fedora's binary name when available.
+if command -v hyprland-dialog >/dev/null 2>&1; then
+  exec hyprland-dialog "$@"
+fi
+
+if command -v notify-send >/dev/null 2>&1; then
+  notify-send "Hyprland GUI utils missing" "Install with: sudo dnf install hyprland-qtutils"
+fi
+
+# Exit success so startup checks stop spamming errors.
+exit 0

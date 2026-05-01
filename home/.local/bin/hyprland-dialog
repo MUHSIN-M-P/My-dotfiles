@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Stub: silences "hyprland-qtutils not installed" warning at Hyprland startup.
+# The real binary lives in the hyprland-qtutils package, which currently
+# conflicts with our Qt 6.10 stack on Fedora 43. Once solopasha rebuilds it,
+# replace this stub with the real binary (sudo dnf install hyprland-qtutils).
+exit 0

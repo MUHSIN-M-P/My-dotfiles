@@ -1,0 +1,11 @@
+--- /etc/xdg/quickshell/noctalia-shell/Services/Compositor/HyprlandService.qml.bak	2026-05-01 15:17:47.832702469 +0530
++++ /etc/xdg/quickshell/noctalia-shell/Services/Compositor/HyprlandService.qml	2026-05-01 15:17:47.891702577 +0530
+@@ -607,7 +607,7 @@
+ 
+   function spawn(command) {
+     try {
+-      Quickshell.execDetached(["hyprctl", "dispatch", "--", "exec"].concat(command));
++      Quickshell.execDetached(command);  // (local) skip hyprctl indirection for faster launch
+     } catch (e) {
+       Logger.e("HyprlandService", "Failed to spawn command:", e);
+     }

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Stub: silences "hyprland-qtutils not installed" warning at Hyprland startup.
+# Hyprland's CVersionKeeperManager checks for this binary; without it, the
+# update-notification path logs a warning. Real binary lives in the
+# hyprland-qtutils package, which conflicts with our Qt 6.10 stack on F43.
+exit 0

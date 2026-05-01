@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# wallcards-video — drive mpvpaper from the wallcards plugin.
+#
+# Subcommands:
+#   set <output> <video>   start mpvpaper for <video> on monitor <output>,
+#                          replacing any running mpvpaper, and persist the
+#                          choice so login can resume it.
+#   clear                  kill any running mpvpaper and clear the state file.
+#   restore                if state file exists, re-run mpvpaper for it.
+#                          (called by exec-once at Hyprland login)
+#   status                 print the current state.
+#
+# State lives at $XDG_STATE_HOME/wallcards-video.state (output<TAB>video).
+
+set -u
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}"
+STATE_FILE="$STATE_DIR/wallcards-video.state"
+MPVPAPER_OPTS="no-audio loop-playlist hwdec=auto pause-on-hidden=yes"
+
+ensure_state_dir() { mkdir -p "$STATE_DIR"; }
+
+kill_existing() {
+  pkill -x mpvpaper 2>/dev/null || true
+  # mpvpaper -f forks; give the child a moment to exit so the wayland surface
+  # is released before a new one binds the same output.
+  for _ in 1 2 3 4 5; do
+    pgrep -x mpvpaper >/dev/null 2>&1 || break
+    sleep 0.1
+  done
+  pkill -9 -x mpvpaper 2>/dev/null || true
+}
+
+start_mpvpaper() {
+  local output="$1" video="$2"
+  [ -r "$video" ] || { echo "wallcards-video: file not readable: $video" >&2; return 1; }
+  mpvpaper -f -l background -o "$MPVPAPER_OPTS" "$output" "$video" >/dev/null 2>&1
+}
+
+cmd_set() {
+  local output="${1:-}" video="${2:-}"
+  [ -n "$output" ] && [ -n "$video" ] || {
+    echo "usage: wallcards-video set <output> <video>" >&2; exit 2; }
+  ensure_state_dir
+  kill_existing
+  start_mpvpaper "$output" "$video" || exit 1
+  printf '%s\t%s\n' "$output" "$video" > "$STATE_FILE"
+}
+
+cmd_clear() {
+  kill_existing
+  rm -f "$STATE_FILE"
+}
+
+cmd_restore() {
+  [ -r "$STATE_FILE" ] || exit 0
+  IFS=$'\t' read -r output video < "$STATE_FILE" || exit 0
+  [ -n "${output:-}" ] && [ -n "${video:-}" ] || exit 0
+  [ -r "$video" ] || { rm -f "$STATE_FILE"; exit 0; }
+  kill_existing
+  start_mpvpaper "$output" "$video" || exit 1
+}
+
+cmd_status() {
+  if [ -r "$STATE_FILE" ]; then cat "$STATE_FILE"; else echo "(no active video)"; fi
+  if pgrep -x mpvpaper >/dev/null 2>&1; then echo "mpvpaper: running"; else echo "mpvpaper: stopped"; fi
+}
+
+case "${1:-}" in
+  set)     shift; cmd_set "$@" ;;
+  clear)   cmd_clear ;;
+  restore) cmd_restore ;;
+  status)  cmd_status ;;
+  *) echo "usage: wallcards-video {set <output> <video>|clear|restore|status}" >&2; exit 2 ;;
+esac

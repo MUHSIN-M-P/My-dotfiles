@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# prewarm-apps — auto-select the most-used apps from Noctalia's launcher
+# tracker (~/.cache/noctalia/shell-state.json) and pre-load their install
+# directories into the kernel page cache via `vmtouch -t`.
+#
+# Cache cost: zero permanent RAM (kernel evicts under memory pressure).
+# Time cost: a few seconds at run time (background).
+#
+# Tunables:
+#   TOP_N         max number of apps to pre-cache
+#   MIN_USES      ignore apps launched fewer than this many times
+#   MAX_TOTAL_MB  hard cap on total bytes loaded into cache (sum of dirs)
+#
+# Run via the systemd user timer prewarm-apps.timer (boot + weekly), or
+# manually: `systemctl --user start prewarm-apps.service`.
+# Log: ~/.local/state/prewarm-apps.log
+
+set -u
+PATH=/usr/local/bin:/usr/bin:$PATH
+
+STATE="$HOME/.cache/noctalia/shell-state.json"
+LOG="$HOME/.local/state/prewarm-apps.log"
+mkdir -p "$(dirname "$LOG")"
+
+TOP_N=8
+MIN_USES=3
+MAX_TOTAL_MB=2000
+
+[ -r "$STATE" ] || { echo "$(date -Is) [skip] no shell-state" >> "$LOG"; exit 0; }
+command -v vmtouch >/dev/null || { echo "$(date -Is) [skip] vmtouch missing" >> "$LOG"; exit 0; }
+
+# Pull top-N app ids by usage count.
+ids=$(python3 - "$STATE" "$TOP_N" "$MIN_USES" <<'PY'
+import json, sys
+state, top_n, min_uses = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+try:
+    u = json.load(open(state)).get('launcherUsage', {})
+except Exception:
+    sys.exit(0)
+items = []
+for k, v in u.items():
+    cnt = v.get('count', 0) if isinstance(v, dict) else int(v)
+    if cnt >= min_uses:
+        items.append((cnt, k))
+items.sort(reverse=True)
+for _, k in items[:top_n]:
+    print(k)
+PY
+)
+
+# For each app id, find its .desktop file and pick a sensible install dir to cache.
+declare -a paths=()
+declare -a chosen=()
+total_mb=0
+
+resolve_install_dir() {
+  # Args: $1 = absolute path of executable
+  # Picks the right "install dir" to vmtouch, biased toward bundle directories.
+  local real="$1" dir
+  case "$real" in
+    /opt/*)
+      # /opt/foo/bin/foo → /opt/foo
+      dir=$(echo "$real" | awk -F/ 'BEGIN{OFS="/"} {print $1, $2, $3}')
+      ;;
+    /usr/share/*)
+      # /usr/share/code/bin/code → /usr/share/code
+      dir=$(echo "$real" | awk -F/ 'BEGIN{OFS="/"} {print $1, $2, $3, $4}')
+      ;;
+    /usr/lib/*|/usr/lib64/*)
+      dir=$(dirname "$real")
+      ;;
+    /usr/bin/*|/bin/*)
+      # Tiny launcher bins → just cache the binary itself
+      dir="$real"
+      ;;
+    *)
+      dir="$real"
+      ;;
+  esac
+  echo "$dir"
+}
+
+find_desktop() {
+  local id="$1" base
+  for d in "$HOME/.local/share/applications" /usr/share/applications /usr/local/share/applications; do
+    for fn in "$d/$id.desktop" "$d/$id"; do
+      [ -f "$fn" ] && echo "$fn" && return 0
+    done
+  done
+  # Fallback: search by exec
+  base=$(grep -lE "^Exec=.*${id}( |$)" /usr/share/applications/*.desktop 2>/dev/null | head -1)
+  [ -n "$base" ] && echo "$base"
+}
+
+for id in $ids; do
+  df=$(find_desktop "$id")
+  [ -z "$df" ] && continue
+  exec_line=$(grep -m1 '^Exec=' "$df" | sed 's/^Exec=//; s/ %[uUfFcCiIkdDnN].*//')
+  cmd=$(awk '{print $1}' <<<"$exec_line")
+  case "$cmd" in
+    env) cmd=$(awk '{print $2}' <<<"$exec_line") ;;
+  esac
+  binpath=$(command -v "$cmd" 2>/dev/null)
+  [ -z "$binpath" ] && [ -x "$cmd" ] && binpath="$cmd"
+  [ -z "$binpath" ] && continue
+  real=$(readlink -f "$binpath")
+  [ -z "$real" ] && continue
+  path=$(resolve_install_dir "$real")
+  [ -e "$path" ] || continue
+  size_mb=$(du -sm "$path" 2>/dev/null | awk '{print $1}')
+  [ -z "$size_mb" ] && continue
+  if (( total_mb + size_mb > MAX_TOTAL_MB )); then continue; fi
+  paths+=("$path")
+  chosen+=("$id ($size_mb MB → $path)")
+  total_mb=$(( total_mb + size_mb ))
+done
+
+# Touch (cache, do not lock) each path in parallel.
+{
+  echo "=== $(date -Is) ==="
+  echo "Selected (total ${total_mb} MB):"
+  printf '  - %s\n' "${chosen[@]}"
+} >> "$LOG"
+
+for p in "${paths[@]}"; do
+  vmtouch -t -q "$p" >/dev/null 2>&1 &
+done
+wait
+
+echo "Done." >> "$LOG"

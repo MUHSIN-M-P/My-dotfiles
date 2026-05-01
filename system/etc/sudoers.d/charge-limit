@@ -1,0 +1,1 @@
+ldzbeta ALL=(root) NOPASSWD: /usr/local/bin/charge-limit

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# charge-limit — toggle the battery charge end-threshold on Linux.
+# Usage: charge-limit 80 | charge-limit 100 | charge-limit status
+#
+# Writes /sys/class/power_supply/BAT*/charge_control_end_threshold.
+# Needs root for the write; intended to be invoked via sudo (NOPASSWD set up
+# at /etc/sudoers.d/charge-limit).
+
+set -u
+
+THRESH_FILE=$(echo /sys/class/power_supply/BAT*/charge_control_end_threshold 2>/dev/null)
+[ -e "$THRESH_FILE" ] || { echo "no charge_control_end_threshold sysfs file found" >&2; exit 1; }
+
+cmd="${1:-status}"
+
+case "$cmd" in
+  status)
+    cur=$(cat "$THRESH_FILE")
+    pct=$(awk -v num="$(cat "${THRESH_FILE%charge_control_end_threshold}charge_now" 2>/dev/null)" \
+              -v full="$(cat "${THRESH_FILE%charge_control_end_threshold}charge_full" 2>/dev/null)" \
+              'BEGIN{ if (full>0) printf "%.0f", (num/full)*100; else print "?"}')
+    echo "limit=${cur}%  charge=${pct}%  file=$THRESH_FILE"
+    ;;
+  80|100)
+    [ "$EUID" -eq 0 ] || { echo "needs root: run via sudo" >&2; exit 1; }
+    echo "$cmd" > "$THRESH_FILE" || { echo "write failed" >&2; exit 1; }
+    cur=$(cat "$THRESH_FILE")
+    msg="Battery charge limit set to ${cur}%"
+    echo "$msg"
+    if [ -n "${SUDO_USER:-}" ] && command -v notify-send >/dev/null; then
+      sudo -u "$SUDO_USER" -- env DISPLAY="${DISPLAY:-}" \
+        WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}" \
+        XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+        notify-send "Battery" "$msg" -i battery 2>/dev/null || true
+    fi
+    ;;
+  *) echo "usage: charge-limit {80|100|status}" >&2; exit 2 ;;
+esac

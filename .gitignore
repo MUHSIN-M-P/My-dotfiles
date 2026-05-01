@@ -1,0 +1,25 @@
+# Machine-specific / runtime / regenerable
+home/.cache/
+home/.local/state/
+home/.config/atuin/history.db
+home/.config/atuin/key
+
+# Quickshell runtime sockets / logs
+home/.config/quickshell/**/by-id/
+home/.config/quickshell/**/by-pid/
+home/.config/quickshell/**/*.lock
+home/.config/quickshell/**/*.qslog
+home/.config/quickshell/**/*.log
+
+# Browser profiles (too big, contain credentials/cookies)
+home/.config/BraveSoftware/
+home/.mozilla/
+
+# Backups
+**/*.bak
+**/*.bak.*
+**/*~
+
+# Editor noise
+.DS_Store
+*.swp

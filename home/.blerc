@@ -1,0 +1,35 @@
+# ble.sh user config. Keep it minimal and unobtrusive — the goal is fish-style
+# inline autosuggestion + dropdown completion, without aggressive colors.
+
+# --- Inline autosuggestion (the grey ghost text after the cursor) ---
+# Suggests from history + filenames. Press Right-arrow or End to accept.
+bleopt complete_auto_complete=1
+bleopt complete_auto_history=1
+
+# How long to wait (ms) after a keystroke before showing the suggestion.
+bleopt complete_polling_cycle=50
+
+# --- Tab behavior: stock bash style ---
+# 0 = first Tab lists all matches, second Tab cycles. (Standard bash behavior.)
+bleopt complete_menu_complete=0
+bleopt complete_menu_style=align
+
+# --- Visual cleanup: kill the aggressive red command-not-found highlight ---
+# These are the styles that drew the pink/red box around "hello" earlier.
+ble-face -s command_builtin_dot fg=default
+ble-face -s command_keyword fg=default
+ble-face -s command_alias fg=default
+ble-face -s command_function fg=default
+ble-face -s command_file fg=default
+ble-face -s command_builtin fg=default
+ble-face -s command_jobs fg=default
+ble-face -s command_directory fg=default
+
+# Make the inline autosuggestion subtle (greyish, not bright)
+ble-face -s auto_complete fg=242
+
+# Quiet the syntax errors a bit too
+ble-face -s syntax_error fg=red
+
+# Don't change the prompt look
+bleopt prompt_eol_mark=

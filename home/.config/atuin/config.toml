@@ -1,0 +1,9 @@
+# atuin: compact style — small dropdown at the bottom of the prompt,
+# not a full-screen TUI takeover.
+style = "compact"
+inline_height = 10
+show_help = false
+show_preview = false
+filter_mode = "global"
+filter_mode_shell_up_key_binding = "global"
+enter_accept = true

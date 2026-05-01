@@ -1,0 +1,9 @@
+[Unit]
+Description=Pre-warm most-used apps into the kernel page cache
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/prewarm-apps
+Nice=10
+IOSchedulingClass=idle
