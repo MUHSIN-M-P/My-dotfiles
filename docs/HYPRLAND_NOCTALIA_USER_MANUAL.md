@@ -35,6 +35,12 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 27. [File & Path Reference](#27-file--path-reference)
 28. [Glossary](#28-glossary)
 29. [Useful Links & Where to Learn More](#29-useful-links--where-to-learn-more)
+30. [Bluetooth](#30-bluetooth)
+31. [Login Speed Tuning](#31-login-speed-tuning)
+32. [Scroll Sensitivity & Natural Scroll](#32-scroll-sensitivity--natural-scroll)
+33. [Caps Lock & Keyboard Options](#33-caps-lock--keyboard-options)
+34. [GitHub Authentication (no SSH)](#34-github-authentication-no-ssh)
+35. [Dotfiles Repo & sync.sh](#35-dotfiles-repo--syncsh)
 
 ---
 
@@ -1021,6 +1027,226 @@ When asking for help on Reddit (`r/hyprland`, `r/Fedora`) or Discord, share:
 1. `hyprctl version`
 2. The relevant section of your config
 3. Logs: `journalctl --user -b 0 | tail -100` and `~/.cache/hyprland/hyprland.log`
+
+---
+
+---
+
+## 30. Bluetooth
+
+Backend: **bluez 5.86** + **blueman** GUI/applet. The Bluetooth adapter is configured for resilient reconnection and silent re-pairing.
+
+### 30.1 Day-to-day
+
+- Pairing / managing devices: open `blueman-manager` (search "Bluetooth" in the launcher).
+- Tray icon: `blueman-applet` autostarts at login (5–6s delay) — click for quick connect/disconnect.
+- CLI scan:
+  ```bash
+  bluetoothctl scan on
+  bluetoothctl pair XX:XX:XX:XX:XX:XX
+  bluetoothctl trust XX:XX:XX:XX:XX:XX
+  bluetoothctl connect XX:XX:XX:XX:XX:XX
+  ```
+
+### 30.2 Tuning applied (`/etc/bluetooth/main.conf`)
+
+```ini
+[General]
+JustWorksRepairing = always   # silently re-pair trusted devices
+FastConnectable    = true     # quicker handshake
+
+[Policy]
+AutoEnable          = true
+ReconnectAttempts   = 7
+ReconnectIntervals  = 1,2,4,8,16,32,64
+```
+
+This fixes the common "device name doesn't show / reconnects fail" symptom. After changing, run `sudo systemctl restart bluetooth`.
+
+### 30.3 Troubleshooting
+
+| symptom | fix |
+|---|---|
+| "Device name shows as MAC address" | toggle the device in blueman-manager once; bluez will fetch the name and cache it |
+| "Sometimes the headphone won't auto-connect" | check `bluetoothctl info <MAC>` — `Trusted: yes` is required for auto |
+| "Adapter not powered on after boot" | `AutoEnable=true` should fix it; verify with `bluetoothctl show` |
+| "Audio is garbled / low quality" | wireplumber probably negotiated a fallback codec; in `pavucontrol` → Configuration tab → set the device profile to A2DP-Sink AAC or LDAC |
+
+---
+
+## 31. Login Speed Tuning
+
+The post-login feel was tuned to render the bar/wallpaper as quickly as possible:
+
+1. **Brave autostart removed** — saved ~200 MB resident + ~500 ms of CPU contention with Hyprland init. Open Brave on demand (`Super+Z`).
+2. **Secondary daemons staggered** in `~/.config/hypr/configs/user-overrides.conf`:
+   - `t+2s`: `wallcards-video restore`
+   - `t+3s`: `quickshell -c overview`
+   - `t+5s`: `easyeffects --gapplication-service`
+   - `t+6s`: `blueman-applet`
+3. **Quickshell QML cache** at `~/.cache/quickshell/qmlcache/` — Quickshell auto-populates on first run; subsequent starts re-use it.
+4. **`hyprland-guiutils` warning silenced** — added `misc:disable_hyprland_guiutils_check = true` to `user-overrides.conf`. This is the upstream-supported way to skip the package-presence check (the actual `hyprland-dialog` and `hyprland-update-screen` runtime calls are satisfied by stubs at `~/.local/bin/`).
+
+If login still feels slow, candidates worth disabling:
+
+- `xdg-desktop-portal-kde` (~484 ms, only used by KDE apps' file pickers — Dolphin tolerates losing it)
+- Any Noctalia plugins you don't actually use (Control Center → Plugins). Each unused plugin's QML still gets scanned.
+
+---
+
+## 32. Scroll Sensitivity & Natural Scroll
+
+Set in `~/.config/hypr/configs/user-overrides.conf` under the `input` block:
+
+```hyprland
+input {
+    natural_scroll = true       # mouse wheel: content moves with finger
+    scroll_factor = 0.5         # mouse wheel sensitivity (1.0 = default)
+    touchpad {
+        natural_scroll = true
+        scroll_factor = 0.4     # touchpad two-finger sensitivity
+    }
+}
+```
+
+| value | feel |
+|---|---|
+| `0.3` | very slow |
+| `0.4–0.5` | comfortable for most laptops |
+| `0.7` | slightly tamer than default |
+| `1.0` | Hyprland default |
+| `1.5+` | faster than default |
+
+App-specific overrides:
+
+- **Brave / Chromium**: `chrome://flags/#smooth-scrolling`
+- **kitty**: `wheel_scroll_min_lines 1` (in `~/.config/kitty/kitty.conf`); raise to `2-3` for fewer-but-bigger steps
+
+After editing: `hyprctl reload`. No restart needed.
+
+---
+
+## 33. Caps Lock & Keyboard Options
+
+`~/.config/hypr/configs/user-overrides.conf` controls keyboard behavior:
+
+```hyprland
+input {
+    kb_layout = us,tr
+    kb_options = grp:alt_shift_toggle
+}
+```
+
+- **Layout switch:** `Alt+Shift` toggles between US and Turkish layouts.
+- **Caps Lock:** acts normally (toggles uppercase). If you ever want **Caps→Escape** (a vim-user trick), append it: `kb_options = caps:escape,grp:alt_shift_toggle`.
+
+Other useful `kb_options`:
+
+| value | effect |
+|---|---|
+| `caps:escape` | Caps Lock acts as Escape |
+| `caps:swapescape` | Caps Lock and Escape swap |
+| `caps:ctrl_modifier` | Caps Lock acts as Ctrl |
+| `compose:rwin` | right Win key becomes Compose |
+| `terminate:ctrl_alt_bksp` | Ctrl+Alt+Backspace kills X / Wayland session |
+
+Combine with commas: `kb_options = caps:ctrl_modifier,grp:alt_shift_toggle`.
+
+---
+
+## 34. GitHub Authentication (no SSH)
+
+GitHub removed password auth in 2021. Two browser-based options that don't need SSH keys:
+
+### 34.1 GitHub CLI (`gh`) — recommended
+
+```bash
+sudo dnf install gh         # already installed
+gh auth login
+```
+
+Walk-through prompts:
+
+1. **GitHub.com** (not Enterprise)
+2. **HTTPS** (you don't want SSH)
+3. **Authenticate Git with your GitHub credentials** → Yes
+4. **Login with a web browser**
+5. Copy the 8-char code shown, browser opens to https://github.com/login/device
+6. Paste code, click "Authorize gh"
+
+`gh` then stores the token in your keyring and configures git's credential helper. Subsequent `git push` to any GitHub repo just works.
+
+### 34.2 Personal Access Token (manual)
+
+1. github.com → Settings → Developer settings → **Personal access tokens** → Tokens (classic) → Generate new token.
+2. Scopes: at minimum `repo`.
+3. Use the token as the **password** when git prompts, with your username as the **username**.
+4. Cache it: `git config --global credential.helper store` (plaintext) or `/usr/libexec/git-core/git-credential-libsecret` (keyring).
+
+The first option (`gh`) is strictly better — token is rotatable from the UI, scoped automatically, and stored in libsecret.
+
+---
+
+## 35. Dotfiles Repo & sync.sh
+
+All your customizations are mirrored in `~/dotfiles/` (a git repo).
+
+### 35.1 Layout
+
+```
+~/dotfiles/
+├── README.md, install.sh, sync.sh, .gitignore
+├── home/    — mirrors into $HOME
+├── system/  — needs sudo (sudoers.d, tmpfiles.d, /etc/bluetooth/main.conf, /usr/local/bin/charge-limit)
+├── patches/ — diffs against system QML files
+└── docs/    — this user manual
+```
+
+### 35.2 Daily workflow
+
+```bash
+cd ~/dotfiles
+
+./sync.sh              # pull current system state into the repo
+git diff               # review what changed
+./sync.sh -c "tweak: scroll factor 0.4 for trackpad"
+                       # same as above + auto-commit with message
+git push               # push to GitHub (after `gh auth login` once)
+```
+
+`sync.sh` is idempotent — files identical to the source are untouched. With `--delete` on whole-tree mirrors (hypr/, kitty/, fastfetch/, plugins/), files removed from your system also disappear from the repo.
+
+### 35.3 Bootstrapping a new machine
+
+```bash
+git clone https://github.com/<you>/dotfiles ~/dotfiles
+cd ~/dotfiles && ./install.sh
+```
+
+`install.sh` does:
+
+1. enable solopasha/hyprland COPR + Flathub
+2. dnf-install all packages
+3. clone & build ble.sh
+4. mirror `home/` → `$HOME` (existing files backed up as `*.preinst.bak`)
+5. install `system/` files via sudo
+6. patch Noctalia's `HyprlandService.qml` for the spawn-path optimization
+7. enable `prewarm-apps.timer`
+8. apply boot battery threshold
+
+Re-running is safe — it always overwrites with the latest repo state.
+
+### 35.4 What's not in the repo
+
+`.gitignore` excludes:
+
+- `home/.cache/`, `home/.local/state/` — regenerable
+- `home/.config/atuin/history.db` — your private shell history
+- `home/.config/BraveSoftware/`, `home/.mozilla/` — browser profiles with credentials
+- Quickshell runtime sockets/logs (`by-id`, `*.qslog`, `*.lock`)
+- `**/*.bak`, `**/*~` — backups
+
+If you add new directories or files outside the patterns `sync.sh` already covers, edit `sync.sh` to include them — it's a 100-line bash script, easy to extend.
 
 ---
 
