@@ -39,8 +39,7 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 31. [Login Speed Tuning](#31-login-speed-tuning)
 32. [Scroll Sensitivity & Natural Scroll](#32-scroll-sensitivity--natural-scroll)
 33. [Caps Lock & Keyboard Options](#33-caps-lock--keyboard-options)
-34. [GitHub Authentication (no SSH)](#34-github-authentication-no-ssh)
-35. [Dotfiles Repo & sync.sh](#35-dotfiles-repo--syncsh)
+34. [Dotfiles Repo & sync.sh](#34-dotfiles-repo--syncsh)
 
 ---
 
@@ -1154,44 +1153,11 @@ Combine with commas: `kb_options = caps:ctrl_modifier,grp:alt_shift_toggle`.
 
 ---
 
-## 34. GitHub Authentication (no SSH)
-
-GitHub removed password auth in 2021. Two browser-based options that don't need SSH keys:
-
-### 34.1 GitHub CLI (`gh`) — recommended
-
-```bash
-sudo dnf install gh         # already installed
-gh auth login
-```
-
-Walk-through prompts:
-
-1. **GitHub.com** (not Enterprise)
-2. **HTTPS** (you don't want SSH)
-3. **Authenticate Git with your GitHub credentials** → Yes
-4. **Login with a web browser**
-5. Copy the 8-char code shown, browser opens to https://github.com/login/device
-6. Paste code, click "Authorize gh"
-
-`gh` then stores the token in your keyring and configures git's credential helper. Subsequent `git push` to any GitHub repo just works.
-
-### 34.2 Personal Access Token (manual)
-
-1. github.com → Settings → Developer settings → **Personal access tokens** → Tokens (classic) → Generate new token.
-2. Scopes: at minimum `repo`.
-3. Use the token as the **password** when git prompts, with your username as the **username**.
-4. Cache it: `git config --global credential.helper store` (plaintext) or `/usr/libexec/git-core/git-credential-libsecret` (keyring).
-
-The first option (`gh`) is strictly better — token is rotatable from the UI, scoped automatically, and stored in libsecret.
-
----
-
-## 35. Dotfiles Repo & sync.sh
+## 34. Dotfiles Repo & sync.sh
 
 All your customizations are mirrored in `~/dotfiles/` (a git repo).
 
-### 35.1 Layout
+### 34.1 Layout
 
 ```
 ~/dotfiles/
@@ -1202,7 +1168,7 @@ All your customizations are mirrored in `~/dotfiles/` (a git repo).
 └── docs/    — this user manual
 ```
 
-### 35.2 Daily workflow
+### 34.2 Daily workflow
 
 ```bash
 cd ~/dotfiles
@@ -1216,7 +1182,7 @@ git push               # push to GitHub (after `gh auth login` once)
 
 `sync.sh` is idempotent — files identical to the source are untouched. With `--delete` on whole-tree mirrors (hypr/, kitty/, fastfetch/, plugins/), files removed from your system also disappear from the repo.
 
-### 35.3 Bootstrapping a new machine
+### 34.3 Bootstrapping a new machine
 
 ```bash
 git clone https://github.com/<you>/dotfiles ~/dotfiles
@@ -1236,7 +1202,7 @@ cd ~/dotfiles && ./install.sh
 
 Re-running is safe — it always overwrites with the latest repo state.
 
-### 35.4 What's not in the repo
+### 34.4 What's not in the repo
 
 `.gitignore` excludes:
 
