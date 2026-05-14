@@ -22,8 +22,8 @@ STATE="$HOME/.cache/noctalia/shell-state.json"
 LOG="$HOME/.local/state/prewarm-apps.log"
 mkdir -p "$(dirname "$LOG")"
 
-TOP_N=8
-MIN_USES=3
+TOP_N=4
+MIN_USES=6
 MAX_TOTAL_MB=2000
 
 [ -r "$STATE" ] || { echo "$(date -Is) [skip] no shell-state" >> "$LOG"; exit 0; }

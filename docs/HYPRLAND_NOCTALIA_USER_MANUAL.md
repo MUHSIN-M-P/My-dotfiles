@@ -57,7 +57,7 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 | Default terminal | **kitty** | `~/.config/kitty/` |
 | Default shell | **bash** with `ble.sh` + `atuin` | `~/.bashrc`, `~/.blerc`, `~/.config/atuin/` |
 | Browser | **Brave** | system; user-level desktop entry at `~/.local/share/applications/brave-browser.desktop` |
-| File manager | **Dolphin** (KDE) | system |
+| File manager | **Nautilus / Files** (GNOME) | system |
 | Audio backend | PipeWire | system |
 | Audio post-processor | EasyEffects | autostarted |
 
@@ -153,7 +153,7 @@ All keybinds are in `~/.config/hypr/configs/keybinds.conf` (system) and `~/.conf
 | Key | Action |
 |---|---|
 | `Super+Return` | Terminal (kitty) |
-| `Super+E` | File manager (Dolphin) |
+| `Super+E` | File manager (Nautilus) |
 | `Alt+Space` / `Super+Space` | Application launcher |
 | `Super+R` | Alt launcher (rofi `drun`) |
 | `Super+Z` | Browser (Brave) |
@@ -236,6 +236,10 @@ Find the class name with `hyprctl clients` while the app is open — look for th
 
 `Super+Shift+P` keeps a floating window visible on every workspace.
 
+### 5.6 Visuals (Gaps & Rounding)
+
+To achieve a clean, sharp look, tiled windows have no rounding and reduced screen edge gaps, while floating windows retain their rounded corners. This is handled in `~/.config/hypr/configs/user-overrides.conf` using Hyprland window rules to disable rounding for tiled windows and `gaps_in` / `gaps_out` under the `general` block to tighten the layout.
+
 ---
 
 ## 6. Workspaces
@@ -302,6 +306,27 @@ pkill -x qs
 | `screen-toolkit` | Screenshot annotation | `Shift+PrintScreen` |
 
 Plugins live at `~/.config/noctalia/plugins/` and `/usr/share/noctalia-plugins/`.
+
+### 7.5 UI Contrast Tweaks
+
+Because Noctalia automatically regenerates its theme from wallpapers or predefined settings (`colors.json` gets overwritten), we applied permanent system-wide QML patches to improve the visibility of panels and the top bar:
+
+1. **Popup Menu Contrast:** The core `NBox.qml` widget and the nested Network Panel sections were patched to calculate a lighter background (`1.51` multiplier) relative to the active theme's surface color.
+2. **Top Bar Icon Background:** The right-side top bar icons were configured to use a custom hardcoded background pill color (`#252629`).
+
+The exact commands used to apply these patches (useful if reinstalling):
+```bash
+# Lighten popup menus
+sudo sed -i 's/property color color: Color.mSurfaceVariant/property color color: Qt.lighter(Color.mSurfaceVariant, 1.51)/g' /etc/xdg/quickshell/noctalia-shell/Widgets/NBox.qml
+sudo sed -i 's/color: showOnlyLists ? Color.mSurfaceVariant : "transparent"/color: showOnlyLists ? Qt.lighter(Color.mSurfaceVariant, 1.51) : "transparent"/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Settings/Tabs/Connections/WifiSubTab.qml
+sudo sed -i 's/color: addHiddenMouseArea.containsMouse ? Color.mSurfaceVariant : Color.mSurface/color: addHiddenMouseArea.containsMouse ? Qt.lighter(Color.mSurfaceVariant, 1.51) : Color.mSurface/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Settings/Tabs/Connections/WifiSubTab.qml
+sudo sed -i 's/colorBg: Color.mSurfaceVariant/colorBg: Qt.lighter(Color.mSurfaceVariant, 1.51)/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Network/NetworkPanel.qml
+sudo sed -i 's/color: Color.mSurfaceVariant/color: Qt.lighter(Color.mSurfaceVariant, 1.51)/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Network/NetworkPanel.qml
+
+# Set top bar icons pill background to #252629
+sudo sed -i 's/: Color.mSurfaceVariant, Settings.data.bar.capsuleOpacity)/: "#252629", Settings.data.bar.capsuleOpacity)/g' /etc/xdg/quickshell/noctalia-shell/Commons/Style.qml
+```
+*(Requires a shell restart to take effect).*
 
 ---
 
@@ -372,7 +397,7 @@ To remove the splash entirely: edit `~/.bashrc` and remove the `fastfetch` line 
 
 ## 10. Files & File Manager
 
-**Dolphin** is the default. Open with `Super+E`.
+**Nautilus** is the default. Open with `Super+E`.
 
 Key features used here:
 
@@ -431,6 +456,15 @@ State is at `~/.local/state/wallcards-video.state`.
 **Important:** the patched plugin invokes the helper at its absolute path `/home/ldzbeta/.local/bin/wallcards-video` because Noctalia's environment may have a minimal `PATH`. If you ever move the helper, update both occurrences in `~/.config/noctalia/plugins/wallcards/WallcardsWindow.qml`.
 
 **Caveat:** matugen color extraction uses the current wallpaper *image*, so the color theme doesn't auto-update from videos. Apply an image once first to establish a palette, then apply a video.
+
+### 12.3 Keyboard Navigation
+
+The Wallcards plugin supports full keyboard navigation. You can use the arrow keys to interact with the UI:
+- **Left/Right**: Cycle through wallpapers
+- **Up**: Shuffle the deck
+- **Down**: Select and apply the focused wallpaper
+
+*(Note: We patched the QML keyboard binding implementation in the Wallcards component to properly restore this arrow-key navigation.)*
 
 ---
 

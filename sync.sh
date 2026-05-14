@@ -32,18 +32,20 @@ R() {  # rsync wrapper that respects dry-run
 
 CP() {  # cp that respects dry-run
   if [ "$DRYRUN" = 1 ]; then
-    [ -e "$1" ] && echo "would copy: $1 → $2"
+    [ -e "$1" ] && echo "would copy: $1 → $2" || true
   else
-    [ -e "$1" ] && install -D "$1" "$2"
+    [ -e "$1" ] && install -D "$1" "$2" || true
   fi
 }
 
 SUDO_CP() {  # sudo cp into dotfiles, retains user-readable perms
   if [ "$DRYRUN" = 1 ]; then
-    [ -e "$1" ] && echo "would sudo-copy: $1 → $2"
+    [ -e "$1" ] && echo "would sudo-copy: $1 → $2" || true
   else
-    sudo -n cp -a "$1" "$2" 2>/dev/null || sudo cp -a "$1" "$2"
-    sudo -n chown "$USER:$USER" "$2" 2>/dev/null || true
+    if [ -e "$1" ]; then
+      sudo -n cp -a "$1" "$2" 2>/dev/null || sudo cp -a "$1" "$2"
+      sudo -n chown "$USER:$USER" "$2" 2>/dev/null || true
+    fi
   fi
 }
 

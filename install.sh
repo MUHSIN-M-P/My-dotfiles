@@ -57,7 +57,7 @@ PKGS=(
   # power / battery
   tuned-ppd vmtouch
   # GUI helpers
-  dolphin nwg-displays pavucontrol nm-connection-editor gnome-control-center gnome-software
+  nautilus nwg-displays pavucontrol nm-connection-editor gnome-control-center gnome-software
   # apps
   brave-browser
   # fonts
@@ -102,13 +102,21 @@ fi
 sudo install -m 0644 "$HERE/system/etc/bluetooth/main.conf" /etc/bluetooth/main.conf
 
 #------------------------------------------------------------------------------
-say "6/9  Patching Noctalia system QML for direct spawn (faster launcher)"
+say "6/9  Patching Noctalia system QML (faster launcher + UI contrast)"
 #------------------------------------------------------------------------------
 TARGET=/etc/xdg/quickshell/noctalia-shell/Services/Compositor/HyprlandService.qml
 if [ -f "$TARGET" ] && ! grep -q '(local) skip hyprctl indirection' "$TARGET"; then
   sudo cp -a "$TARGET" "$TARGET.bak"
   sudo sed -i 's|Quickshell.execDetached(\["hyprctl", "dispatch", "--", "exec"\].concat(command));|Quickshell.execDetached(command);  // (local) skip hyprctl indirection for faster launch|' "$TARGET"
 fi
+
+# Apply UI Contrast Tweaks (Popup menus and top bar)
+sudo sed -i 's/property color color: Color.mSurfaceVariant/property color color: Qt.lighter(Color.mSurfaceVariant, 1.51)/g' /etc/xdg/quickshell/noctalia-shell/Widgets/NBox.qml
+sudo sed -i 's/color: showOnlyLists ? Color.mSurfaceVariant : "transparent"/color: showOnlyLists ? Qt.lighter(Color.mSurfaceVariant, 1.51) : "transparent"/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Settings/Tabs/Connections/WifiSubTab.qml
+sudo sed -i 's/color: addHiddenMouseArea.containsMouse ? Color.mSurfaceVariant : Color.mSurface/color: addHiddenMouseArea.containsMouse ? Qt.lighter(Color.mSurfaceVariant, 1.51) : Color.mSurface/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Settings/Tabs/Connections/WifiSubTab.qml
+sudo sed -i 's/colorBg: Color.mSurfaceVariant/colorBg: Qt.lighter(Color.mSurfaceVariant, 1.51)/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Network/NetworkPanel.qml
+sudo sed -i 's/color: Color.mSurfaceVariant/color: Qt.lighter(Color.mSurfaceVariant, 1.51)/g' /etc/xdg/quickshell/noctalia-shell/Modules/Panels/Network/NetworkPanel.qml
+sudo sed -i 's/: Color.mSurfaceVariant, Settings.data.bar.capsuleOpacity)/: "#252629", Settings.data.bar.capsuleOpacity)/g' /etc/xdg/quickshell/noctalia-shell/Commons/Style.qml
 
 #------------------------------------------------------------------------------
 say "7/9  Enabling prewarm-apps user timer"

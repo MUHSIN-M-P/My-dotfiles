@@ -83,7 +83,7 @@
                 {
                     "clockColor": "none",
                     "customFont": "Montserrat ExtraBold",
-                    "formatHorizontal": "HH:mm",
+                    "formatHorizontal": "h:mm AP",
                     "formatVertical": "HH mm - dd MM",
                     "id": "Clock",
                     "tooltipFormat": "HH:mm ddd, MMM dd",
@@ -139,7 +139,7 @@
                     "showLoadAverage": false,
                     "showMemoryAsPercent": false,
                     "showMemoryUsage": true,
-                    "showNetworkStats": false,
+                    "showNetworkStats": true,
                     "showSwapUsage": false,
                     "textColor": "none",
                     "useMonospaceFont": false,
@@ -170,15 +170,14 @@
                     "visualizerType": "wave"
                 },
                 {
-                    "blacklist": [
-                    ],
-                    "chevronColor": "none",
-                    "colorizeIcons": true,
-                    "drawerEnabled": true,
-                    "hidePassive": false,
-                    "id": "Tray",
-                    "pinned": [
-                    ]
+                    "capsLockIcon": "circle-letter-c",
+                    "hideWhenOff": true,
+                    "id": "LockKeys",
+                    "numLockIcon": "circle-letter-n",
+                    "scrollLockIcon": "circle-letter-s",
+                    "showCapsLock": true,
+                    "showNumLock": true,
+                    "showScrollLock": true
                 },
                 {
                     "displayMode": "onhover",
@@ -201,49 +200,6 @@
                     "id": "NotificationHistory",
                     "showUnreadBadge": true,
                     "unreadBadgeColor": "primary"
-                },
-                {
-                    "defaultSettings": {
-                        "colorHistory": [
-                        ],
-                        "detectedCompositor": "",
-                        "detectedRecorder": "",
-                        "filenameFormat": "",
-                        "installedLangs": [
-                            "eng"
-                        ],
-                        "paletteColors": [
-                        ],
-                        "screenshotPath": "",
-                        "selectedOcrLang": "eng",
-                        "transAvailable": false,
-                        "videoPath": ""
-                    },
-                    "id": "plugin:screen-toolkit"
-                },
-                {
-                    "defaultSettings": {
-                        "audioCodec": "opus",
-                        "audioSource": "default_output",
-                        "colorRange": "limited",
-                        "copyToClipboard": false,
-                        "customReplayDuration": "30",
-                        "directory": "",
-                        "filenamePattern": "recording_yyyyMMdd_HHmmss",
-                        "frameRate": "60",
-                        "hideInactive": false,
-                        "iconColor": "none",
-                        "quality": "very_high",
-                        "replayDuration": "30",
-                        "replayEnabled": false,
-                        "replayStorage": "ram",
-                        "resolution": "original",
-                        "restorePortalSession": false,
-                        "showCursor": true,
-                        "videoCodec": "h264",
-                        "videoSource": "portal"
-                    },
-                    "id": "plugin:screen-recorder"
                 },
                 {
                     "defaultSettings": {
@@ -276,6 +232,12 @@
                         "top_bar_radius": 10
                     },
                     "id": "plugin:wallcards"
+                },
+                {
+                    "displayMode": "onhover",
+                    "iconColor": "none",
+                    "id": "Network",
+                    "textColor": "none"
                 },
                 {
                     "deviceNativePath": "__default__",
@@ -324,7 +286,7 @@
     },
     "colorSchemes": {
         "darkMode": true,
-        "generationMethod": "content",
+        "generationMethod": "rainbow",
         "manualSunrise": "06:30",
         "manualSunset": "18:30",
         "monitorForColors": "eDP-1",
@@ -412,8 +374,8 @@
                         "scale": 5,
                         "showBackground": false,
                         "useCustomFont": true,
-                        "x": 528,
-                        "y": 120
+                        "x": 480,
+                        "y": 96
                     },
                     {
                         "defaultSettings": {
@@ -432,24 +394,10 @@
                             "useGradient": true
                         },
                         "id": "plugin:deskvis",
-                        "scale": 0.9166666666666666,
+                        "scale": 0.85,
                         "showBackground": true,
-                        "x": 600,
-                        "y": 336
-                    },
-                    {
-                        "defaultSettings": {
-                        },
-                        "id": "plugin:custom-sticker",
-                        "image": "/home/ldzbeta/Downloads/ibinu.png",
-                        "mirror": false,
-                        "opacity": 1,
-                        "roundedCorners": true,
-                        "scale": 2.56,
-                        "showBackground": false,
-                        "verticalMirror": false,
-                        "x": 48,
-                        "y": 48
+                        "x": 552,
+                        "y": 312
                     }
                 ]
             }
@@ -493,14 +441,14 @@
         "allowPanelsOnScreenWithoutBar": true,
         "allowPasswordWithFprintd": false,
         "animationDisabled": false,
-        "animationSpeed": 0.9,
+        "animationSpeed": 1,
         "autoStartAuth": false,
         "avatarImage": "/home/ldzbeta/.face",
         "boxRadiusRatio": 1,
         "clockFormat": "hh\\nmm",
         "clockStyle": "analog",
         "compactLockScreen": true,
-        "dimmerOpacity": 0.37,
+        "dimmerOpacity": 0.35,
         "enableBlurBehind": true,
         "enableLockScreenCountdown": true,
         "enableLockScreenMediaControls": false,
@@ -543,7 +491,7 @@
         "radiusRatio": 1,
         "reverseScroll": true,
         "scaleRatio": 1.05,
-        "screenRadiusRatio": 1.4,
+        "screenRadiusRatio": 0,
         "shadowDirection": "center",
         "shadowOffsetX": 0,
         "shadowOffsetY": 0,
@@ -568,7 +516,7 @@
     },
     "idle": {
         "customCommands": "[]",
-        "enabled": false,
+        "enabled": true,
         "fadeDuration": 5,
         "lockCommand": "",
         "lockTimeout": 660,
@@ -586,7 +534,7 @@
         "firstDayOfWeek": -1,
         "hideWeatherCityName": false,
         "hideWeatherTimezone": false,
-        "name": "kolkata",
+        "name": "Malappuram",
         "showCalendarEvents": true,
         "showCalendarWeather": true,
         "showWeekNumberInCalendar": false,
@@ -827,7 +775,7 @@
         "fontDefaultScale": 1,
         "fontFixed": "JetBrainsMono Nerd Font",
         "fontFixedScale": 1,
-        "panelBackgroundOpacity": 0,
+        "panelBackgroundOpacity": 0.42000000000000004,
         "panelsAttachedToBar": true,
         "scrollbarAlwaysVisible": true,
         "settingsPanelMode": "window",
