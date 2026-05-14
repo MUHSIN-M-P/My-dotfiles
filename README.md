@@ -4,6 +4,7 @@ A complete personal Fedora 43 setup: Hyprland compositor, Noctalia shell,
 kitty + bash + ble.sh + atuin, custom video-wallpaper support, battery
 charge limit, adaptive page-cache pre-warming, and a written user manual.
 
+i built it from the rice made by https://github.com/elrondforwin/hyprdots/tree/noctalia and modified it
 ## What's in here
 
 ```
@@ -41,7 +42,7 @@ dotfiles/
 ## Quick start on a fresh Fedora 43 machine
 
 ```bash
-git clone https://github.com/<you>/dotfiles ~/dotfiles
+git clone https://github.com/MUHSIN-M-P/dotfiles ~/dotfiles
 cd ~/dotfiles
 ./install.sh
 ```
