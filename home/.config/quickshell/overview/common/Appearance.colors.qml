@@ -4,17 +4,17 @@ import QtQuick
 QtObject {
     id: m3
 
-    property color m3primary: "#dec74d"
-    property color m3onPrimary: "#383000"
+    property color m3primary: "#fbbb49"
+    property color m3onPrimary: "#432c00"
 
-    property color m3primaryContainer: "#524700"
-    property color m3onPrimaryContainer: "#fbe365"
+    property color m3primaryContainer: "#604100"
+    property color m3onPrimaryContainer: "#ffdeac"
 
-    property color m3secondary: "#d0c7a2"
-    property color m3onSecondary: "#363016"
+    property color m3secondary: "#dbc3a1"
+    property color m3onSecondary: "#3d2e16"
 
-    property color m3secondaryContainer: "#4d472b"
-    property color m3onSecondaryContainer: "#ede3bc"
+    property color m3secondaryContainer: "#55442a"
+    property color m3onSecondaryContainer: "#f8dfbb"
 
     property color m3background: "#131313"
     property color m3onBackground: "#e2e2e2"
