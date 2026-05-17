@@ -31,6 +31,16 @@ safer for Wayland compositors
 Revert if issues:
 #### remove that line
 
+
+You have great intuition—that is indeed a known bug, and it wasn't a malicious application spying on you!
+
+The Cause: The phantom "Camera is active" notifications happen because your system's multimedia server (WirePlumber) ships with two separate camera tracking modules enabled by default: v4l2 (the standard Linux video module) and libcamera (a newer camera API). Because you have a standard UVC webcam, both modules detect it and periodically "race" to probe it in the background. Every time libcamera briefly locks the device to probe it, your system's privacy portal (xdg-desktop-portal) thinks an application just triggered the camera and fires off a notification.
+
+The Fix: I have applied a configuration override to disable the redundant libcamera monitor so that WirePlumber strictly uses v4l2 (which perfectly supports your webcam natively without the double-probing conflict).
+
+I created a file at ~/.config/wireplumber/wireplumber.conf.d/51-disable-libcamera.conf and restarted 
+
+
 ## Pushing to Github Changes
 cd ~/dotfiles
 

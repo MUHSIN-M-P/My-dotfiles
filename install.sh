@@ -101,6 +101,20 @@ if [ -f /etc/bluetooth/main.conf ] && ! cmp -s "$HERE/system/etc/bluetooth/main.
 fi
 sudo install -m 0644 "$HERE/system/etc/bluetooth/main.conf" /etc/bluetooth/main.conf
 
+# SDDM Theme Installation
+if [ -d "$HERE/system/usr/share/sddm/themes/noctalia" ]; then
+  say "Installing SDDM Noctalia Theme..."
+  sudo mkdir -p /usr/share/sddm/themes/noctalia
+  sudo rsync -a --delete "$HERE/system/usr/share/sddm/themes/noctalia/" /usr/share/sddm/themes/noctalia/
+  
+  # Register & Enable theme in sddm.conf.d
+  sudo mkdir -p /etc/sddm.conf.d
+  sudo tee /etc/sddm.conf.d/noctalia.conf >/dev/null <<'CONFIG'
+[Theme]
+Current=noctalia
+CONFIG
+fi
+
 #------------------------------------------------------------------------------
 say "6/9  Patching Noctalia system QML (faster launcher + UI contrast)"
 #------------------------------------------------------------------------------

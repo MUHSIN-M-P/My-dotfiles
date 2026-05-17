@@ -40,6 +40,7 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 32. [Scroll Sensitivity & Natural Scroll](#32-scroll-sensitivity--natural-scroll)
 33. [Caps Lock & Keyboard Options](#33-caps-lock--keyboard-options)
 34. [Dotfiles Repo & sync.sh](#34-dotfiles-repo--syncsh)
+35. [Professional SDDM Login Screen (Noctalia-Aligned)](#35-professional-sddm-login-screen-noctalia-aligned)
 
 ---
 
@@ -1251,3 +1252,60 @@ If you add new directories or files outside the patterns `sync.sh` already cover
 ---
 
 *Last updated: based on the live state of this machine after our setup session. Edit freely as you change things — this file is yours.*
+
+---
+
+## 35. Professional SDDM Login Screen (Noctalia-Aligned)
+
+A fully customized, professional SDDM login theme (`noctalia`) modeled after the Noctalia desktop shell's premium aesthetic.
+
+### 35.1 File Architecture & Paths
+All theme files are located in:
+* **Real System Location:** `/usr/share/sddm/themes/noctalia/`
+* **Dotfiles Mirror:** `~/dotfiles/system/usr/share/sddm/themes/noctalia/`
+
+Key Files:
+* `Main.qml` — The core logic, design, styling, and animations of the login theme.
+* `theme.conf` — SDDM configuration options (e.g., custom background image).
+* `fonts/` — Embedded font files (`Montserrat-Regular.otf` and `noctalia-tabler-icons.ttf`).
+
+### 35.2 How to Customize & Configure
+
+#### 35.2.1 Changing the Background Wallpaper
+The theme respects the background path set in `/usr/share/sddm/themes/noctalia/theme.conf`.
+To change it, edit `/usr/share/sddm/themes/noctalia/theme.conf` and update the `background` property:
+```ini
+[General]
+background=/path/to/your/wallpaper.png
+```
+
+#### 35.2.2 Tuning the Resolution Scaling Ratio
+If elements appear too large or too small on your specific monitor, you can adjust the scaling engine in `/usr/share/sddm/themes/noctalia/Main.qml`.
+Look for `scaleRatio` around line 9:
+```qml
+readonly property real scaleRatio: {
+    var ratio = Screen.width / 1920.0;
+    // Tweak 1.35 (baseline multiplier) and 3.5 (maximum clamp) as desired:
+    return Math.max(1.35, Math.min(ratio * 1.35, 3.5));
+}
+```
+
+#### 35.2.3 Customizing Password Characters (Tabler Sequence)
+The dynamic character sequence shown as you type is mapped inside `/usr/share/sddm/themes/noctalia/Main.qml` via:
+```qml
+readonly property var passwordChars: ["\uf671", "\uf68c", "\u{1000c}", "\uf6a5", "\uf67b", "\ufeb1", "\uf6ad"]
+```
+These are Unicode sequences corresponding to custom Tabler symbols in the loaded font.
+
+### 35.3 Troubleshooting & Reference
+
+#### 35.3.1 GNOME is Selected Instead of Hyprland on Startup
+* **Symptom:** On system boot, the session dropdown defaults to GNOME, requiring you to manually switch back to Hyprland every time.
+* **The Fix:** This issue is solved by a delayed startup synchronization script in `Main.qml` (under the `focusTimerSlow` block around line 830). It waits `300ms` for the asynchronous SDDM C++ models to register, then queries `sessionModel.lastIndex`. If no index is saved, it searches the session list for a case-insensitive match for `"hyprland"` (excluding `"uwsm"`) and auto-selects it.
+
+#### 35.3.2 Password Input Field Does Not Have Keyboard Focus
+* **Symptom:** You cannot immediately start typing your password on boot.
+* **The Fix:** The theme runs a dual-timer focus loop on startup:
+  * `focusTimer` (`100ms` delay): Triggers an immediate focus request.
+  * `focusTimerSlow` (`300ms` delay): Retries focus once the interface has fully rendered.
+  * If focus is ever lost, clicking the background or closing a dropdown automatically returns active focus to the password field (`pwField`).

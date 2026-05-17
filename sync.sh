@@ -57,6 +57,7 @@ say "1/5  Mirroring whole-tree configs (with --delete to track removals)"
 R --delete ~/.config/hypr/                          "$HERE/home/.config/hypr/"
 R --delete ~/.config/kitty/                         "$HERE/home/.config/kitty/"
 R --delete ~/.config/fastfetch/                     "$HERE/home/.config/fastfetch/"
+R --delete ~/.config/xdg-desktop-portal/            "$HERE/home/.config/xdg-desktop-portal/"
 
 # Noctalia: only settings + plugins (skip cache and runtime)
 R --delete --include='settings.json' --include='plugins/***' --exclude='*' \
@@ -101,6 +102,18 @@ SUDO_CP /etc/tmpfiles.d/charge-limit.conf           "$HERE/system/etc/tmpfiles.d
 SUDO_CP /etc/bluetooth/main.conf                    "$HERE/system/etc/bluetooth/main.conf"
 SUDO_CP /usr/local/bin/charge-limit                 "$HERE/system/usr/local/bin/charge-limit"
 
+# SDDM Theme synchronization
+if [ -d /usr/share/sddm/themes/noctalia ]; then
+  if [ "$DRYRUN" = 1 ]; then
+    echo "would sudo-copy whole SDDM theme directory"
+  else
+    mkdir -p "$HERE/system/usr/share/sddm/themes/noctalia"
+    sudo -n rsync -a --delete --exclude='.git' /usr/share/sddm/themes/noctalia/ "$HERE/system/usr/share/sddm/themes/noctalia/" 2>/dev/null || \
+    sudo rsync -a --delete --exclude='.git' /usr/share/sddm/themes/noctalia/ "$HERE/system/usr/share/sddm/themes/noctalia/"
+    sudo -n chown -R "$USER:$USER" "$HERE/system/usr/share/sddm/themes/noctalia/" 2>/dev/null || true
+  fi
+fi
+
 # QML patch (regenerate from current state)
 if [ -f /etc/xdg/quickshell/noctalia-shell/Services/Compositor/HyprlandService.qml.bak ] && \
    [ "$DRYRUN" != 1 ]; then
@@ -112,7 +125,8 @@ fi
 #------------------------------------------------------------------------------
 say "5/5  Manual"
 #------------------------------------------------------------------------------
-CP ~/Downloads/HYPRLAND_NOCTALIA_USER_MANUAL.md     "$HERE/docs/HYPRLAND_NOCTALIA_USER_MANUAL.md"
+# Manual is managed directly inside ~/dotfiles/docs/HYPRLAND_NOCTALIA_USER_MANUAL.md
+# as the absolute source of truth. No longer copying from ~/Downloads.
 
 #------------------------------------------------------------------------------
 say "Git status"
