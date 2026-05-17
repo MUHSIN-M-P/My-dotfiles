@@ -123,8 +123,9 @@ done
 } >> "$LOG"
 
 for p in "${paths[@]}"; do
-  vmtouch -t -q "$p" >/dev/null 2>&1 &
+  # Run vmtouch sequentially with idle I/O priority (ionice -c 3) and low CPU priority (nice -n 19)
+  # to completely eliminate any performance impact on the active user session.
+  nice -n 19 ionice -c 3 vmtouch -t -q "$p" >/dev/null 2>&1
 done
-wait
 
 echo "Done." >> "$LOG"

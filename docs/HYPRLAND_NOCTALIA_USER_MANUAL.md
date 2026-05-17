@@ -96,12 +96,12 @@ The 30 things you'll use most. **`Super`** is the Windows / Command key.
 | Toggle wallpaper picker | `Super+Y` |
 | Take a screenshot | `PrintScreen` |
 | Annotate after screenshot | `Shift+PrintScreen` |
+| Extract text (OCR) | `Ctrl+PrintScreen` (or `Super+Shift+S`) |
 | Clipboard history | `Super+V` |
 | Wipe clipboard | `Super+Shift+V` |
 | Emoji picker | `Super+.` |
 | Volume up / down / mute | `XF86AudioRaise/Lower/Mute` |
 | Brightness up / down | `XF86MonBrightnessUp/Down` |
-| Switch keyboard layout (US ↔ TR) | `Alt+Shift` |
 
 ---
 
@@ -168,6 +168,7 @@ All keybinds are in `~/.config/hypr/configs/keybinds.conf` (system) and `~/.conf
 | `Super+Y` | Wallpaper picker (Wallcards) |
 | `PrintScreen` | Region screenshot (HyprQuickFrame) |
 | `Shift+PrintScreen` | Annotate the just-captured screenshot |
+| `Ctrl+PrintScreen` / `Super+Shift+S` | Region screenshot & OCR (copies text to clipboard) |
 | `Super+V` | Clipboard history (Noctalia) |
 | `Super+Shift+V` | Wipe clipboard |
 | `Super+.` | Emoji picker |
@@ -473,6 +474,7 @@ The Wallcards plugin supports full keyboard navigation. You can use the arrow ke
 
 - `PrintScreen` → region selector via **HyprQuickFrame** (Quickshell-based). Screenshots save to `~/Pictures/Screenshots/`.
 - `Shift+PrintScreen` → annotate the most recent capture (Noctalia screen-toolkit plugin).
+- `Ctrl+PrintScreen` or `Super+Shift+S` → region screenshot with OCR (extracts text and copies it to clipboard using Tesseract).
 
 For a screen recorder, install `wf-recorder`:
 
@@ -1166,13 +1168,13 @@ After editing: `hyprctl reload`. No restart needed.
 
 ```hyprland
 input {
-    kb_layout = us,tr
-    kb_options = grp:alt_shift_toggle
+    kb_layout = us
+    kb_options =
 }
 ```
 
-- **Layout switch:** `Alt+Shift` toggles between US and Turkish layouts.
-- **Caps Lock:** acts normally (toggles uppercase). If you ever want **Caps→Escape** (a vim-user trick), append it: `kb_options = caps:escape,grp:alt_shift_toggle`.
+- **Layout switch:** (Removed) Previously toggled between US and Turkish layouts via `Alt+Shift`.
+- **Caps Lock:** acts normally (toggles uppercase). If you ever want **Caps→Escape** (a vim-user trick), set `kb_options = caps:escape`.
 
 Other useful `kb_options`:
 
@@ -1184,7 +1186,7 @@ Other useful `kb_options`:
 | `compose:rwin` | right Win key becomes Compose |
 | `terminate:ctrl_alt_bksp` | Ctrl+Alt+Backspace kills X / Wayland session |
 
-Combine with commas: `kb_options = caps:ctrl_modifier,grp:alt_shift_toggle`.
+Combine with commas: `kb_options = caps:ctrl_modifier`.
 
 ---
 

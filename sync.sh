@@ -97,10 +97,20 @@ done
 #------------------------------------------------------------------------------
 say "4/5  System files (sudo)"
 #------------------------------------------------------------------------------
+# Create required system subdirectories in dotfiles repo
+mkdir -p "$HERE/system/etc/sudoers.d" \
+         "$HERE/system/etc/systemd/system.conf.d" \
+         "$HERE/system/etc/systemd/user.conf.d" \
+         "$HERE/system/etc/security/limits.d"
+
 SUDO_CP /etc/sudoers.d/charge-limit                 "$HERE/system/etc/sudoers.d/charge-limit"
+SUDO_CP /etc/sudoers.d/sddm-wallpaper               "$HERE/system/etc/sudoers.d/sddm-wallpaper"
 SUDO_CP /etc/tmpfiles.d/charge-limit.conf           "$HERE/system/etc/tmpfiles.d/charge-limit.conf"
 SUDO_CP /etc/bluetooth/main.conf                    "$HERE/system/etc/bluetooth/main.conf"
 SUDO_CP /usr/local/bin/charge-limit                 "$HERE/system/usr/local/bin/charge-limit"
+SUDO_CP /etc/systemd/system.conf.d/limits.conf      "$HERE/system/etc/systemd/system.conf.d/limits.conf"
+SUDO_CP /etc/systemd/user.conf.d/limits.conf        "$HERE/system/etc/systemd/user.conf.d/limits.conf"
+SUDO_CP /etc/security/limits.d/99-nofile-limits.conf "$HERE/system/etc/security/limits.d/99-nofile-limits.conf"
 
 # SDDM Theme synchronization
 if [ -d /usr/share/sddm/themes/noctalia ]; then

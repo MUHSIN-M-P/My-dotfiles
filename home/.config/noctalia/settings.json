@@ -568,9 +568,9 @@
         "disableWallpaper": true
     },
     "notifications": {
-        "backgroundOpacity": 0.51,
+        "backgroundOpacity": 0.3,
         "clearDismissed": true,
-        "criticalUrgencyDuration": 15,
+        "criticalUrgencyDuration": 10,
         "density": "default",
         "enableBatteryToast": true,
         "enableKeyboardLayoutToast": true,
@@ -581,7 +581,7 @@
         "lowUrgencyDuration": 3,
         "monitors": [
         ],
-        "normalUrgencyDuration": 8,
+        "normalUrgencyDuration": 4,
         "overlayLayer": true,
         "respectExpireTimeout": true,
         "saveToHistory": {

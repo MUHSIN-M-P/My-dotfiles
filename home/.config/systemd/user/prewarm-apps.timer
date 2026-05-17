@@ -2,10 +2,10 @@
 Description=Pre-warm apps once after login + every week
 
 [Timer]
-OnStartupSec=60s
+OnStartupSec=150s
 OnUnitActiveSec=1w
-Persistent=true
-RandomizedDelaySec=2m
+Persistent=false
+RandomizedDelaySec=30s
 
 [Install]
 WantedBy=timers.target

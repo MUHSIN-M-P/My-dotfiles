@@ -30,6 +30,28 @@ case $1 in
     fi
     ;;
 
+  "ocr")
+    IMAGE="/tmp/ocr.png"
+
+    # Select region and take screenshot
+    if ! grim -g "$(slurp)" "$IMAGE"; then
+        exit 0
+    fi
+
+    # Perform OCR directly to stdout and capture the result
+    RESULT=$(tesseract "$IMAGE" stdout -l eng 2>/dev/null | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+    if [ -n "$RESULT" ]; then
+        echo -n "$RESULT" | wl-copy
+        notify-send "OCR Result" "Text copied to clipboard:\n$RESULT"
+    else
+        notify-send "OCR Result" "No text detected in the selected area" -u low
+    fi
+
+    # Clean up
+    rm -f "$IMAGE"
+    ;;
+
   "toggle-anim")
     HYPRANIM=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
     if [ "$HYPRANIM" = 1 ]; then
