@@ -1,11 +1,11 @@
 [Unit]
-Description=Pre-warm apps once after login + every week
+Description=Delayed app prewarming
 
 [Timer]
-OnStartupSec=150s
+OnStartupSec=2min
 OnUnitActiveSec=1w
+AccuracySec=30s
 Persistent=false
-RandomizedDelaySec=30s
 
 [Install]
 WantedBy=timers.target

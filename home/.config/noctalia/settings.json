@@ -439,10 +439,10 @@
     },
     "general": {
         "allowPanelsOnScreenWithoutBar": true,
-        "allowPasswordWithFprintd": false,
+        "allowPasswordWithFprintd": true,
         "animationDisabled": false,
         "animationSpeed": 1,
-        "autoStartAuth": false,
+        "autoStartAuth": true,
         "avatarImage": "/home/ldzbeta/.face",
         "boxRadiusRatio": 1,
         "clockFormat": "hh\\nmm",
