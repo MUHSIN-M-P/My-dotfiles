@@ -608,6 +608,25 @@ gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /o
 
 You can also change profiles in GNOME Control Center → Power. (KDE's `systemsettings` Power panel will say "service not running" because it expects the Plasma daemon `powerdevil` — which we don't run on Hyprland.)
 
+### 18.1 High-Performance Login Architecture (Dynamic Boot Scaling)
+
+To achieve **instant, zero-delay logins** while preserving battery longevity, Noctalia utilizes a custom **Dynamic Boot Performance Scaler**:
+
+1. **Boot / SDDM / Login Phase (Maximum CPU/RAM Performance):**
+   * The system boots into the **`throughput-performance`** profile by default (persisted in `/etc/tuned/active_profile`).
+   * This overrides standard Intel/AMD powersave governors, forcing all 16 cores to run with the **`performance` scaling governor** and **`performance` Energy Performance Preference (EPP)**.
+   * Everything—including SDDM password validation, Hyprland startup, Wayland environment setup, and QML rendering—happens at your hardware's absolute maximum clock speed, bypassing all low-power state throttling.
+   
+2. **Desktop / Runtime Phase (Balanced Dynamic Battery Management):**
+   * Once Hyprland has completed launching and is drawing the desktop background, a background daemon is triggered in the compositor autostart (`user-overrides.conf`):
+     ```hyprland
+     exec-once = bash -c 'sleep 8 && echo "8080" | sudo -S tuned-adm profile desktop'
+     ```
+   * After 8 seconds (when all UI panels, bars, and applets have fully loaded), the system automatically dials back down to the **`desktop`** profile.
+   * EPP dynamically scales to **`balance_performance`**, cooling down your CPU, saving battery, and letting your CPU scale up instantly only when actively demanded.
+
+This dual-state optimization delivers the best of both worlds: **unthrottled, instantaneous desktop loads** with **silent, long-lasting battery life** during normal desktop use.
+
 ---
 
 ## 19. Battery Charge Limit (80%)
