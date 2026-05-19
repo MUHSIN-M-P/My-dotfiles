@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# Fetch current profile
+current=$(gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Get org.freedesktop.UPower.PowerProfiles ActiveProfile)
+
+# Strip out enclosing types and single quotes to get the pure string
+# e.g., (<'balanced'>,) -> balanced
+# e.g., (<'power-saver'>,) -> power-saver
+current_clean=$(echo "$current" | grep -oP "'\K[^']+")
+
+case "$current_clean" in
+    "power-saver")
+        new_profile="balanced"
+        display_name="Balanced ⚖️"
+        icon="power-profile-balanced-symbolic"
+        msg="Standard dynamic performance and cooling"
+        ;;
+    "balanced")
+        new_profile="performance"
+        display_name="Performance 🚀"
+        icon="power-profile-performance-symbolic"
+        msg="Maximum power limits and fan speed"
+        ;;
+    *)
+        new_profile="power-saver"
+        display_name="Silent 🍃"
+        icon="power-profile-power-saver-symbolic"
+        msg="System throttled for quiet acoustics"
+        ;;
+esac
+
+# Apply the new profile
+gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Set org.freedesktop.UPower.PowerProfiles ActiveProfile "<'$new_profile'>" >/dev/null
+
+# Send premium transient notification (replaces existing fan-profile notifications in-place)
+notify-send \
+    -h string:x-canonical-private-synchronous:fan-profile \
+    -a "System" \
+    -i "$icon" \
+    -t 2000 \
+    "Fan Profile: $display_name" \
+    "$msg"

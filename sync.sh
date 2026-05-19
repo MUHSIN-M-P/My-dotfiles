@@ -43,7 +43,7 @@ SUDO_CP() {  # sudo cp into dotfiles, retains user-readable perms
     [ -e "$1" ] && echo "would sudo-copy: $1 → $2" || true
   else
     if [ -e "$1" ]; then
-      sudo -n cp -a "$1" "$2" 2>/dev/null || sudo cp -a "$1" "$2"
+      sudo -n cp -a "$1" "$2" 2>/dev/null || true
       sudo -n chown "$USER:$USER" "$2" 2>/dev/null || true
     fi
   fi
@@ -86,7 +86,7 @@ CP ~/.config/fontconfig/fonts.conf                  "$HERE/home/.config/fontconf
 #------------------------------------------------------------------------------
 say "3/5  ~/.local/bin helper scripts and .desktop overrides"
 #------------------------------------------------------------------------------
-for s in charge-limit wallcards-video prewarm-apps \
+for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
          hyprland-dialog hyprland-update-screen hyprland-guiutils; do
   CP ~/.local/bin/"$s"                              "$HERE/home/.local/bin/$s"
 done
@@ -112,14 +112,19 @@ SUDO_CP /etc/systemd/system.conf.d/limits.conf      "$HERE/system/etc/systemd/sy
 SUDO_CP /etc/systemd/user.conf.d/limits.conf        "$HERE/system/etc/systemd/user.conf.d/limits.conf"
 SUDO_CP /etc/security/limits.d/99-nofile-limits.conf "$HERE/system/etc/security/limits.d/99-nofile-limits.conf"
 
+# Background services overrides
+for s in dnf-makecache fstrim packagekit plocate-updatedb; do
+  mkdir -p "$HERE/system/etc/systemd/system/$s.service.d"
+  SUDO_CP /etc/systemd/system/"$s".service.d/override.conf "$HERE/system/etc/systemd/system/$s.service.d/override.conf"
+done
+
 # SDDM Theme synchronization
 if [ -d /usr/share/sddm/themes/noctalia ]; then
   if [ "$DRYRUN" = 1 ]; then
     echo "would sudo-copy whole SDDM theme directory"
   else
     mkdir -p "$HERE/system/usr/share/sddm/themes/noctalia"
-    sudo -n rsync -a --delete --exclude='.git' /usr/share/sddm/themes/noctalia/ "$HERE/system/usr/share/sddm/themes/noctalia/" 2>/dev/null || \
-    sudo rsync -a --delete --exclude='.git' /usr/share/sddm/themes/noctalia/ "$HERE/system/usr/share/sddm/themes/noctalia/"
+    sudo -n rsync -a --delete --exclude='.git' /usr/share/sddm/themes/noctalia/ "$HERE/system/usr/share/sddm/themes/noctalia/" 2>/dev/null || true
     sudo -n chown -R "$USER:$USER" "$HERE/system/usr/share/sddm/themes/noctalia/" 2>/dev/null || true
   fi
 fi

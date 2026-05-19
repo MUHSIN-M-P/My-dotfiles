@@ -579,17 +579,34 @@ For Brave's UI specifically: it doesn't read GTK/KDE fonts; it scales with the c
 
 ## 18. Power Management
 
-Power profiles (Performance / Balanced / Power Saver) are managed by **tuned-ppd** which is already running. Switch with:
+Power profiles (Performance / Balanced / Power Saver) are managed by **tuned-ppd** (which translates the standard Power-Profiles-Daemon API to TuneD profiles). 
+
+You can cycle the system's fan and power profile immediately using the **`Fn+F`** hardware hotkey (maps to `XF86Launch4`) or **`Super+F5`** on your keyboard. 
+
+When toggled, it cycles the system:
+1. **Silent 🍃** (`power-saver` / `powersave` profile, ASUS throttle policy `2`) — Quiet acoustics and throttled power.
+2. **Balanced ⚖️** (`balanced` / `balanced` profile, ASUS throttle policy `0`) — Default dynamic performance.
+3. **Performance 🚀** (`performance` / `throughput-performance` profile, ASUS throttle policy `1`) — Maximum power limits and fan curves.
+
+A premium, custom On-Screen Display (OSD) notification will slide in from the corner to indicate the active profile.
+
+To query or toggle profiles manually via D-Bus (without needing `sudo` passwords):
 
 ```bash
-powerprofilesctl                         # show current
-powerprofilesctl list                    # all available
-powerprofilesctl set power-saver         # battery-friendly
-powerprofilesctl set balanced            # default
-powerprofilesctl set performance         # max
+# Get the active profile
+gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Get org.freedesktop.UPower.PowerProfiles ActiveProfile
+
+# Set to Balanced mode
+gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Set org.freedesktop.UPower.PowerProfiles ActiveProfile "<'balanced'>"
+
+# Set to Performance mode
+gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Set org.freedesktop.UPower.PowerProfiles ActiveProfile "<'performance'>"
+
+# Set to Silent/Quiet mode
+gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Set org.freedesktop.UPower.PowerProfiles ActiveProfile "<'power-saver'>"
 ```
 
-Or via GNOME Control Center → Power. (KDE's `systemsettings` Power panel will say "service not running" because it expects the Plasma daemon `powerdevil` — which we don't run on Hyprland. Use `powerprofilesctl` or GNOME Control Center instead.)
+You can also change profiles in GNOME Control Center → Power. (KDE's `systemsettings` Power panel will say "service not running" because it expects the Plasma daemon `powerdevil` — which we don't run on Hyprland.)
 
 ---
 

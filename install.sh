@@ -101,6 +101,20 @@ if [ -f /etc/bluetooth/main.conf ] && ! cmp -s "$HERE/system/etc/bluetooth/main.
 fi
 sudo install -m 0644 "$HERE/system/etc/bluetooth/main.conf" /etc/bluetooth/main.conf
 
+# Systemd Limits config
+sudo mkdir -p /etc/systemd/system.conf.d /etc/systemd/user.conf.d
+sudo install -m 0644 "$HERE/system/etc/systemd/system.conf.d/limits.conf" /etc/systemd/system.conf.d/limits.conf
+sudo install -m 0644 "$HERE/system/etc/systemd/user.conf.d/limits.conf" /etc/systemd/user.conf.d/limits.conf
+
+# Systemd background services override files for perceived responsiveness
+for s in dnf-makecache fstrim packagekit plocate-updatedb; do
+  sudo mkdir -p /etc/systemd/system/"$s".service.d
+  sudo install -m 0644 "$HERE/system/etc/systemd/system/$s.service.d/override.conf" /etc/systemd/system/"$s".service.d/override.conf
+done
+
+# Optimize boot time by masking NetworkManager-wait-online.service
+sudo systemctl mask NetworkManager-wait-online.service
+
 # SDDM Theme Installation
 if [ -d "$HERE/system/usr/share/sddm/themes/noctalia" ]; then
   say "Installing SDDM Noctalia Theme..."

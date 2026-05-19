@@ -291,7 +291,8 @@ Run this command in your terminal to update `/etc/pam.d/sddm`:
 ```bash
 sudo tee /etc/pam.d/sddm << 'EOF'
 auth     [success=done ignore=ignore default=bad] pam_selinux_permit.so
-auth     sufficient                                   pam_fprintd.so
+auth     [success=2 default=ignore]                   pam_unix.so try_first_pass nullok
+auth     sufficient                                   pam_fprintd.so max-tries=1
 auth     substack                                     password-auth
 -auth    optional                                     pam_gnome_keyring.so
 auth     include                                      postlogin
