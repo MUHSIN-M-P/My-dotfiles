@@ -3,10 +3,10 @@
 # Fetch current profile
 current=$(gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Get org.freedesktop.UPower.PowerProfiles ActiveProfile)
 
-# Strip out enclosing types and single quotes to get the pure string
+# Strip out enclosing types, single quotes, and whitespace to get the pure string
 # e.g., (<'balanced'>,) -> balanced
 # e.g., (<'power-saver'>,) -> power-saver
-current_clean=$(echo "$current" | grep -oP "'\K[^']+")
+current_clean=$(echo "$current" | tr -d "<>(')," | tr -d '[:space:]')
 
 case "$current_clean" in
     "power-saver")

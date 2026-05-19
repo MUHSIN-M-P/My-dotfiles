@@ -581,7 +581,7 @@ For Brave's UI specifically: it doesn't read GTK/KDE fonts; it scales with the c
 
 Power profiles (Performance / Balanced / Power Saver) are managed by **tuned-ppd** (which translates the standard Power-Profiles-Daemon API to TuneD profiles). 
 
-You can cycle the system's fan and power profile immediately using the **`Fn+F`** hardware hotkey (maps to `XF86Launch4`) or **`Super+F5`** on your keyboard. 
+You can cycle the system's fan and power profile immediately using the **`Fn+F`** hardware hotkey (maps to raw keycodes `482` / `490` representing `KEY_FN_F`) or **`Super+F5`** on your keyboard. 
 
 When toggled, it cycles the system:
 1. **Silent 🍃** (`power-saver` / `powersave` profile, ASUS throttle policy `2`) — Quiet acoustics and throttled power.
