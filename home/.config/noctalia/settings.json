@@ -1,6 +1,6 @@
 {
     "appLauncher": {
-        "autoPasteClipboard": false,
+        "autoPasteClipboard": true,
         "clipboardWatchImageCommand": "wl-paste --type image --watch cliphist store",
         "clipboardWatchTextCommand": "wl-paste --type text --watch cliphist store",
         "clipboardWrapText": true,
@@ -232,6 +232,14 @@
                         "top_bar_radius": 10
                     },
                     "id": "plugin:wallcards"
+                },
+                {
+                    "defaultSettings": {
+                        "connectedColor": "primary",
+                        "disconnectedColor": "none",
+                        "refreshInterval": 5000
+                    },
+                    "id": "plugin:cloudflare-warp"
                 },
                 {
                     "displayMode": "onhover",
@@ -568,7 +576,7 @@
         "disableWallpaper": true
     },
     "notifications": {
-        "backgroundOpacity": 0.3,
+        "backgroundOpacity": 0.7000000000000001,
         "clearDismissed": true,
         "criticalUrgencyDuration": 10,
         "density": "default",

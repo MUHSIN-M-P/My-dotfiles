@@ -997,6 +997,16 @@ Item {
       }
     }
 
+    function triggerAutoPaste() {
+      root.triggerAutoPaste();
+    }
+
+    function getSettings(): string {
+      const settings = JSON.stringify(root.pluginApi ? root.pluginApi.pluginSettings : {});
+      console.log("[CLIPPER SETTINGS DEBUG]: " + settings);
+      return settings;
+    }
+
     function closePanel() {
       if (root.pluginApi) {
         root.pluginApi.withCurrentScreen(screen => {
@@ -1292,7 +1302,9 @@ Item {
     interval: pluginApi?.pluginSettings?.autoPasteDelay ?? 300
     repeat: false
     onTriggered: {
+      Logger.w("Clipper", "[DEBUG]: autoPasteTimer triggered. wtypeAvailable: " + root.wtypeAvailable);
       if (root.wtypeAvailable) {
+        Logger.w("Clipper", "[DEBUG]: Executing autoPasteProc: wtype -M ctrl v");
         autoPasteProc.running = true;
       } else {
         Logger.w("Clipper", "Auto-paste failed: wtype not found. Install with: sudo pacman -S wtype");
@@ -1303,9 +1315,10 @@ Item {
   // Process to trigger auto-paste via wtype Ctrl+V
   Process {
     id: autoPasteProc
-    command: ["wtype", "-M", "ctrl", "-M", "shift", "v"]
+    command: ["wtype", "-M", "ctrl", "v"]
     running: false
     onExited: exitCode => {
+      Logger.w("Clipper", "[DEBUG]: autoPasteProc exited with code: " + exitCode);
       if (exitCode !== 0) {
         Logger.w("Clipper", "wtype auto-paste exited with code: " + exitCode);
       }
@@ -1314,6 +1327,7 @@ Item {
 
   // Public function called from Panel.qml
   function triggerAutoPaste() {
+    Logger.w("Clipper", "[DEBUG]: triggerAutoPaste() called. Delay: " + autoPasteTimer.interval);
     autoPasteTimer.restart();
   }
 

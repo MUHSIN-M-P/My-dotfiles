@@ -38,3 +38,7 @@ __atuin_bind_up_arrow=false
 
 # ble.sh — attach at the very end, after all other hooks are in place.
 [[ ${BLE_VERSION-} ]] && ble-attach
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/ldzbeta/.local/bin:$PATH"

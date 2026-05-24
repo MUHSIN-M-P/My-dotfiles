@@ -1189,13 +1189,16 @@ Item {
                         }
 
                         onClicked: {
+                            Logger.w("Clipper", "[DEBUG]: Card clicked, ID: " + clipboardId);
                             root.selectedIndex = index;
                             root.pluginApi?.mainInstance?.copyToClipboard(clipboardId);
                             if (root.pluginApi) {
+                                Logger.w("Clipper", "[DEBUG]: Closing panel. autoPaste: " + (root.pluginApi.pluginSettings?.autoPaste ?? false) + ", rmbOnly: " + (root.pluginApi.pluginSettings?.autoPasteOnRightClick ?? false));
                                 root.pluginApi.closePanel(screen);
                                 const autoPaste = root.pluginApi.pluginSettings?.autoPaste ?? false;
                                 const rmbOnly = root.pluginApi.pluginSettings?.autoPasteOnRightClick ?? false;
                                 if (autoPaste && !rmbOnly) {
+                                    Logger.w("Clipper", "[DEBUG]: Triggering auto-paste!");
                                     root.pluginApi.mainInstance?.triggerAutoPaste();
                                 }
                             }
