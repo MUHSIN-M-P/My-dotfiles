@@ -21,6 +21,7 @@ Scope {
   readonly property string pamConfigDirectory: "/etc/pam.d"
   property string pamConfig: Quickshell.env("NOCTALIA_PAM_SERVICE") || "login"
   property bool pamReady: false
+  readonly property bool fingerprintActive: pamReady && !waitingForPassword && !unlockInProgress && currentText === ""
 
   Component.onCompleted: {
     if (Quickshell.env("NOCTALIA_PAM_SERVICE")) {

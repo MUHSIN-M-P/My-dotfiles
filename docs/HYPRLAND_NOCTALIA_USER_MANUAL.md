@@ -330,6 +330,19 @@ sudo sed -i 's/: Color.mSurfaceVariant, Settings.data.bar.capsuleOpacity)/: "#25
 ```
 *(Requires a shell restart to take effect).*
 
+### 7.6 Custom Capsule Color Shade
+
+You can customize the color shade of the bar capsules. By default, capsules use colors from the active theme or color scheme keys. If you set the capsule color key to `none`, you can choose a custom color shade (useful if you prefer a subtle grey, dark, or accent shade).
+
+- **Settings UI**: Open the Noctalia Control Center (gear icon in the bar) -> **Bar** -> **Show capsule** must be enabled -> Set **Capsule color** selection to the first choice (none) -> A **Custom capsule color** picker row will appear below it, allowing you to select your preferred shade.
+- **Config file**: The setting is saved in `~/.config/noctalia/settings.json` under:
+  ```json
+  "bar": {
+    "capsuleColorKey": "none",
+    "customCapsuleColor": "#252629"
+  }
+  ```
+
 ---
 
 ## 8. Application Launcher

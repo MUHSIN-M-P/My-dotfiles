@@ -15,7 +15,7 @@ translate_action() {
         echo "Toggle Floating Mode"
     elif [[ "$act" == "pseudo" ]]; then
         echo "Toggle Pseudo Tiling"
-    elif [[ "$act" == "togglesplit" ]]; then
+    elif [[ "$act" == *"togglesplit"* ]]; then
         echo "Toggle Split Layout Direction"
     elif [[ "$act" == *"fullscreen"* ]]; then
         if [[ "$act" == *"1"* ]]; then

@@ -93,6 +93,13 @@ Loader {
         WlSessionLockSurface {
           id: lockSurface
 
+          onVisibleChanged: {
+            if (visible) {
+              Logger.i("LockScreen", "Session lock surface visible, clearing password input");
+              lockContext.currentText = "";
+            }
+          }
+
           Loader {
             anchors.fill: parent
             active: true
@@ -307,6 +314,9 @@ Loader {
                   }
 
                   Keys.onPressed: function (event) {
+                    if (event.key === Qt.Key_Space && text.length === 0) {
+                      event.accepted = true;
+                    }
                     if (Keybinds.checkKey(event, 'enter', Settings)) {
                       lockContext.tryUnlock();
                       event.accepted = true;
@@ -317,7 +327,11 @@ Loader {
                     }
                   }
 
-                  Component.onCompleted: forceActiveFocus()
+                  Component.onCompleted: {
+                    text = "";
+                    lockContext.currentText = "";
+                    forceActiveFocus();
+                  }
                 }
 
                 // Main panel with password, weather, media, session controls
@@ -363,13 +377,20 @@ Loader {
                 }
 
                 Keys.onPressed: function (event) {
+                  if (event.key === Qt.Key_Space && text.length === 0) {
+                    event.accepted = true;
+                  }
                   if (Keybinds.checkKey(event, 'enter', Settings)) {
                     lockContext.tryUnlock();
                     event.accepted = true;
                   }
                 }
 
-                Component.onCompleted: forceActiveFocus()
+                Component.onCompleted: {
+                  text = "";
+                  lockContext.currentText = "";
+                  forceActiveFocus();
+                }
               }
 
               MouseArea {

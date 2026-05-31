@@ -842,6 +842,8 @@
       "appearance-background-opacity-label": "Bar background opacity",
       "appearance-capsule-color-description": "Choose a colour for bar capsules, or use none for the default surface colour.",
       "appearance-capsule-color-label": "Capsule colour",
+      "appearance-custom-capsule-color-description": "Choose a custom colour shade for the default capsule colour.",
+      "appearance-custom-capsule-color-label": "Custom capsule colour",
       "appearance-capsule-opacity-description": "Set the opacity level for widget backgrounds when capsule is shown.",
       "appearance-capsule-opacity-label": "Capsule opacity",
       "appearance-content-padding-description": "Adjust the padding between bar edges and widgets.",

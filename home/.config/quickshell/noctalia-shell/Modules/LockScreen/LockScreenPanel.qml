@@ -767,10 +767,37 @@ Item {
             spacing: Style.marginL
 
             NIcon {
-              icon: "login-2"
+              id: lockIcon
+              icon: (lockControl && lockControl.fingerprintActive) ? "fingerprint" : "login-2"
               pointSize: Style.fontSizeL
-              color: passwordInput.activeFocus ? Color.mPrimary : Color.mOnSurfaceVariant
+              color: (lockControl && lockControl.fingerprintActive) ? Color.mPrimary : (passwordInput.activeFocus ? Color.mPrimary : Color.mOnSurfaceVariant)
               anchors.verticalCenter: parent.verticalCenter
+
+              SequentialAnimation on opacity {
+                loops: Animation.Infinite
+                running: lockControl && lockControl.fingerprintActive && root.animationsEnabled
+                NumberAnimation {
+                  to: 0.4
+                  duration: 800
+                  easing.type: Easing.InOutQuad
+                }
+                NumberAnimation {
+                  to: 1.0
+                  duration: 800
+                  easing.type: Easing.InOutQuad
+                }
+              }
+
+              Timer {
+                interval: 800
+                running: lockControl && lockControl.fingerprintActive && !root.animationsEnabled
+                repeat: true
+                onTriggered: parent.opacity = parent.opacity > 0.6 ? 0.4 : 1.0
+              }
+
+              onIconChanged: {
+                opacity = 1.0;
+              }
             }
 
             Row {
@@ -855,7 +882,7 @@ Item {
                     Repeater {
                       id: iconRepeater
                       model: ScriptModel {
-                        values: Array(passwordInput.text.length)
+                        values: Array.from({length: passwordInput.text.length}, (_, i) => i)
                       }
 
                       property list<string> passwordChars: ["circle-filled", "pentagon-filled", "michelin-star-filled", "square-rounded-filled", "guitar-pick-filled", "blob-filled", "triangle-filled"]

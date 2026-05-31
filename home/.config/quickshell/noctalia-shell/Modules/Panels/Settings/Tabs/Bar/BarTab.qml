@@ -11,6 +11,8 @@ ColumnLayout {
   id: root
   spacing: 0
 
+  property var screen
+
   // Helper functions to update arrays immutably
   function addMonitor(list, name) {
     const arr = (list || []).slice();
@@ -209,7 +211,9 @@ ColumnLayout {
     id: tabView
     currentIndex: subTabBar.currentIndex
 
-    AppearanceSubTab {}
+    AppearanceSubTab {
+      screen: root.screen
+    }
     WidgetsSubTab {
       availableWidgets: availableWidgets
       addWidgetToSection: root._addWidgetToSection

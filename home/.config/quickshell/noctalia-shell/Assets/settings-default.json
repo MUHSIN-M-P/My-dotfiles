@@ -9,6 +9,7 @@
     "showCapsule": true,
     "capsuleOpacity": 1,
     "capsuleColorKey": "none",
+    "customCapsuleColor": "#252629",
     "widgetSpacing": 6,
     "contentPadding": 2,
     "fontScale": 1,

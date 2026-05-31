@@ -10,6 +10,8 @@ ColumnLayout {
   spacing: Style.marginL
   Layout.fillWidth: true
 
+  property var screen
+
   NComboBox {
     Layout.fillWidth: true
     label: I18n.tr("panels.bar.appearance-position-label")
@@ -204,10 +206,33 @@ ColumnLayout {
     visible: Settings.data.bar.showCapsule
     label: I18n.tr("panels.bar.appearance-capsule-color-label")
     description: I18n.tr("panels.bar.appearance-capsule-color-description")
-    noneColor: Color.mSurfaceVariant
-    noneOnColor: Color.mOnSurfaceVariant
+    noneColor: Settings.data.bar.customCapsuleColor
+    noneOnColor: {
+      var c = Qt.color(Settings.data.bar.customCapsuleColor);
+      var luminance = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+      return luminance > 0.5 ? "#000000" : "#ffffff";
+    }
     currentKey: Settings.data.bar.capsuleColorKey
     onSelected: key => Settings.data.bar.capsuleColorKey = key
+  }
+
+  RowLayout {
+    Layout.fillWidth: true
+    visible: Settings.data.bar.showCapsule && Settings.data.bar.capsuleColorKey === "none"
+    spacing: Style.marginS
+
+    NLabel {
+      label: I18n.tr("panels.bar.appearance-custom-capsule-color-label")
+      description: I18n.tr("panels.bar.appearance-custom-capsule-color-description")
+      Layout.alignment: Qt.AlignTop
+      Layout.fillWidth: true
+    }
+
+    NColorPicker {
+      screen: root.screen
+      selectedColor: Settings.data.bar.customCapsuleColor
+      onColorSelected: color => Settings.data.bar.customCapsuleColor = color.toString()
+    }
   }
 
   NValueSlider {

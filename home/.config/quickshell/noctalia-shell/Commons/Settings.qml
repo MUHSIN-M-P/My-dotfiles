@@ -210,6 +210,7 @@ Singleton {
       property bool showCapsule: true
       property real capsuleOpacity: 1.0
       property string capsuleColorKey: "none"
+      property string customCapsuleColor: "#252629"
       property int widgetSpacing: 6
       property int contentPadding: 2
       property real fontScale: 1.0
