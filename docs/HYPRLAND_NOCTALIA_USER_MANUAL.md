@@ -626,17 +626,18 @@ You can also change profiles in GNOME Control Center → Power. (KDE's `systemse
 To achieve **instant, zero-delay logins** while preserving battery longevity, Noctalia utilizes a custom **Dynamic Boot Performance Scaler**:
 
 1. **Boot / SDDM / Login Phase (Maximum CPU/RAM Performance):**
-   * The system boots into the **`throughput-performance`** profile by default (persisted in `/etc/tuned/active_profile`).
+   * Upon shutdown or reboot, the systemd service **`tuned-bootfast-reset.service`** saves the current profile to `/etc/tuned/ppd_runtime_profile` and sets `/etc/tuned/ppd_base_profile` to **`performance`** (mapped to `throughput-performance`).
    * This overrides standard Intel/AMD powersave governors, forcing all 16 cores to run with the **`performance` scaling governor** and **`performance` Energy Performance Preference (EPP)**.
    * Everything—including SDDM password validation, Hyprland startup, Wayland environment setup, and QML rendering—happens at your hardware's absolute maximum clock speed, bypassing all low-power state throttling.
    
 2. **Desktop / Runtime Phase (Balanced Dynamic Battery Management):**
-   * Once Hyprland has completed launching and is drawing the desktop background, a background daemon is triggered in the compositor autostart (`user-overrides.conf`):
+   * Once Hyprland has completed launching and is drawing the desktop background, the autostart script in `user-overrides.conf` triggers the restoration helper:
      ```hyprland
-     exec-once = bash -c 'sleep 8 && echo "8080" | sudo -S tuned-adm profile desktop'
+     exec-once = ~/.local/bin/restore-power-profile
      ```
-   * After 8 seconds (when all UI panels, bars, and applets have fully loaded), the system automatically dials back down to the **`desktop`** profile.
-   * EPP dynamically scales to **`balance_performance`**, cooling down your CPU, saving battery, and letting your CPU scale up instantly only when actively demanded.
+   * After 8 seconds (when all UI panels, bars, and applets have fully loaded), the script reads the saved profile and sets it via D-Bus (requiring no root password or privileges).
+   * If the user preferred profile was **`balanced`**, PPD maps it to **`desktop`** on AC power (allowing **`balance_performance`** EPP and CPU scaling) or **`balanced-battery`** on battery power.
+   * If the user preferred profile was **`power-saver`** (Silent mode), it automatically throttles down to save battery and reduce fan noise.
 
 This dual-state optimization delivers the best of both worlds: **unthrottled, instantaneous desktop loads** with **silent, long-lasting battery life** during normal desktop use.
 

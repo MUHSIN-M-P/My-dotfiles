@@ -106,6 +106,13 @@ sudo mkdir -p /etc/systemd/system.conf.d /etc/systemd/user.conf.d
 sudo install -m 0644 "$HERE/system/etc/systemd/system.conf.d/limits.conf" /etc/systemd/system.conf.d/limits.conf
 sudo install -m 0644 "$HERE/system/etc/systemd/user.conf.d/limits.conf" /etc/systemd/user.conf.d/limits.conf
 
+# Boot scaling service reset for fast boot
+if [ -f "$HERE/system/etc/systemd/system/tuned-bootfast-reset.service" ]; then
+  sudo install -m 0644 "$HERE/system/etc/systemd/system/tuned-bootfast-reset.service" /etc/systemd/system/tuned-bootfast-reset.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable tuned-bootfast-reset.service
+fi
+
 # Systemd background services override files for perceived responsiveness
 for s in dnf-makecache fstrim packagekit plocate-updatedb; do
   sudo mkdir -p /etc/systemd/system/"$s".service.d

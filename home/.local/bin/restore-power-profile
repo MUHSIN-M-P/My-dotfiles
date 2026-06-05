@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+# Sleep to let the desktop finish drawing and loading applets/panels
+sleep 8
+
+# Read the saved runtime profile, default to balanced
+profile=$(cat /etc/tuned/ppd_runtime_profile 2>/dev/null)
+profile=$(echo "$profile" | tr -d '[:space:]')
+
+# Clean/validate input (allow only power-saver, balanced, performance)
+if [[ "$profile" != "power-saver" && "$profile" != "balanced" && "$profile" != "performance" ]]; then
+    profile="balanced"
+fi
+
+# Set the active profile via D-Bus (requires no root permissions)
+gdbus call --system \
+    --dest org.freedesktop.UPower.PowerProfiles \
+    --object-path /org/freedesktop/UPower/PowerProfiles \
+    --method org.freedesktop.DBus.Properties.Set \
+    org.freedesktop.UPower.PowerProfiles ActiveProfile "<'$profile'>" >/dev/null

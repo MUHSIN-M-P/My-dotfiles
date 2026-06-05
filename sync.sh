@@ -82,12 +82,14 @@ CP ~/.config/gtk-3.0/settings.ini                   "$HERE/home/.config/gtk-3.0/
 CP ~/.config/gtk-4.0/settings.ini                   "$HERE/home/.config/gtk-4.0/settings.ini"
 CP ~/.config/kdeglobals                             "$HERE/home/.config/kdeglobals"
 CP ~/.config/fontconfig/fonts.conf                  "$HERE/home/.config/fontconfig/fonts.conf"
+CP ~/.config/autostart/noctalia-session-cleanup.desktop "$HERE/home/.config/autostart/noctalia-session-cleanup.desktop"
 
 #------------------------------------------------------------------------------
 say "3/5  ~/.local/bin helper scripts and .desktop overrides"
 #------------------------------------------------------------------------------
 for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
-         hyprland-dialog hyprland-update-screen hyprland-guiutils; do
+         hyprland-dialog hyprland-update-screen hyprland-guiutils \
+         noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl; do
   CP ~/.local/bin/"$s"                              "$HERE/home/.local/bin/$s"
 done
 for f in brave-browser.desktop org.gnome.Settings.desktop; do
@@ -99,6 +101,7 @@ say "4/5  System files (sudo)"
 #------------------------------------------------------------------------------
 # Create required system subdirectories in dotfiles repo
 mkdir -p "$HERE/system/etc/sudoers.d" \
+         "$HERE/system/etc/systemd/system" \
          "$HERE/system/etc/systemd/system.conf.d" \
          "$HERE/system/etc/systemd/user.conf.d" \
          "$HERE/system/etc/security/limits.d"
@@ -111,6 +114,7 @@ SUDO_CP /usr/local/bin/charge-limit                 "$HERE/system/usr/local/bin/
 SUDO_CP /etc/systemd/system.conf.d/limits.conf      "$HERE/system/etc/systemd/system.conf.d/limits.conf"
 SUDO_CP /etc/systemd/user.conf.d/limits.conf        "$HERE/system/etc/systemd/user.conf.d/limits.conf"
 SUDO_CP /etc/security/limits.d/99-nofile-limits.conf "$HERE/system/etc/security/limits.d/99-nofile-limits.conf"
+SUDO_CP /etc/systemd/system/tuned-bootfast-reset.service "$HERE/system/etc/systemd/system/tuned-bootfast-reset.service"
 
 # Background services overrides
 for s in dnf-makecache fstrim packagekit plocate-updatedb; do

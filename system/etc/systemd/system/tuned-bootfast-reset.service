@@ -1,0 +1,20 @@
+[Unit]
+Description=Reset TuneD PPD profile to performance on shutdown for fast boot
+DefaultDependencies=no
+Before=shutdown.target reboot.target halt.target
+Requires=tuned.service
+After=tuned.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c '\
+  if [ -f /etc/tuned/ppd_base_profile ]; then \
+    cat /etc/tuned/ppd_base_profile > /etc/tuned/ppd_runtime_profile; \
+  fi; \
+  echo "performance" > /etc/tuned/ppd_base_profile; \
+  echo "throughput-performance" > /etc/tuned/active_profile; \
+'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=shutdown.target reboot.target halt.target

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Noctalia Session Cleanup
+Comment=Cleans up prewarmed assets from memory if login is not Hyprland
+Exec=/home/ldzbeta/.local/bin/noctalia-session-cleanup
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
