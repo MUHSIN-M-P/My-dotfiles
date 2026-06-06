@@ -69,7 +69,7 @@ R --delete --exclude='by-id' --exclude='by-pid' --exclude='*.lock' \
    ~/.config/quickshell/                            "$HERE/home/.config/quickshell/"
 
 # systemd user units we manage
-R --delete --include='prewarm-apps.*' --exclude='*' \
+R --delete --include='prewarm-apps.*' --include='wl-clip-persist.*' --exclude='*' \
    ~/.config/systemd/user/                          "$HERE/home/.config/systemd/user/"
 
 #------------------------------------------------------------------------------
@@ -89,7 +89,8 @@ say "3/5  ~/.local/bin helper scripts and .desktop overrides"
 #------------------------------------------------------------------------------
 for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
          hyprland-dialog hyprland-update-screen hyprland-guiutils \
-         noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl; do
+         noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl \
+         sysupdate sysfind nvrun; do
   CP ~/.local/bin/"$s"                              "$HERE/home/.local/bin/$s"
 done
 for f in brave-browser.desktop org.gnome.Settings.desktop; do

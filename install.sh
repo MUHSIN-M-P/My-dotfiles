@@ -68,13 +68,18 @@ PKGS=(
 sudo dnf -y install "${PKGS[@]}" || warn "Some packages failed; continuing."
 
 #------------------------------------------------------------------------------
-say "3/9  Building ble.sh into ~/.local/share/blesh"
+say "3/9  Building external helpers (ble.sh & wl-clip-persist)"
 #------------------------------------------------------------------------------
 if [ ! -d "$HOME_DIR/.local/share/blesh" ]; then
   tmp=$(mktemp -d)
   git clone --depth 1 --recursive https://github.com/akinomyoga/ble.sh.git "$tmp"
   ( cd "$tmp" && make install PREFIX="$HOME_DIR/.local" )
   rm -rf "$tmp"
+fi
+
+if ! [ -f "$HOME_DIR/.local/bin/wl-clip-persist" ] && command -v cargo >/dev/null; then
+  say "Compiling wl-clip-persist from source..."
+  sudo -u "$USER_NAME" -H cargo install --git https://github.com/Linus789/wl-clip-persist --root "$HOME_DIR/.local"
 fi
 
 #------------------------------------------------------------------------------
@@ -154,10 +159,11 @@ sudo sed -i 's/color: Color.mSurfaceVariant/color: Qt.lighter(Color.mSurfaceVari
 sudo sed -i 's/: Color.mSurfaceVariant, Settings.data.bar.capsuleOpacity)/: "#252629", Settings.data.bar.capsuleOpacity)/g' /etc/xdg/quickshell/noctalia-shell/Commons/Style.qml
 
 #------------------------------------------------------------------------------
-say "7/9  Enabling prewarm-apps user timer"
+say "7/9  Enabling systemd user services (prewarm-apps & wl-clip-persist)"
 #------------------------------------------------------------------------------
 systemctl --user daemon-reload
-systemctl --user enable --now prewarm-apps.timer 2>/dev/null || warn "Could not enable timer (run again after first login)."
+systemctl --user enable --now prewarm-apps.timer 2>/dev/null || warn "Could not enable prewarm-apps.timer (run again after first login)."
+systemctl --user enable --now wl-clip-persist.service 2>/dev/null || warn "Could not enable wl-clip-persist.service (run again after first login)."
 
 #------------------------------------------------------------------------------
 say "8/9  Applying boot battery-charge threshold"

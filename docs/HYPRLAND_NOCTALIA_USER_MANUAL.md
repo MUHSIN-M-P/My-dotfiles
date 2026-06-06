@@ -41,6 +41,9 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 33. [Caps Lock & Keyboard Options](#33-caps-lock--keyboard-options)
 34. [Dotfiles Repo & sync.sh](#34-dotfiles-repo--syncsh)
 35. [Professional SDDM Login Screen (Noctalia-Aligned)](#35-professional-sddm-login-screen-noctalia-aligned)
+36. [Universal Package Manager Bridge (sysupdate & sysfind)](#36-universal-package-manager-bridge-sysupdate--sysfind)
+37. [Wayland Clipboard Persistence Service (wl-clip-persist)](#37-wayland-clipboard-persistence-service-wl-clip-persist)
+38. [Dedicated GPU Launcher Wrapper (nvrun)](#38-dedicated-gpu-launcher-wrapper-nvrun)
 
 ---
 
@@ -1361,3 +1364,72 @@ These are Unicode sequences corresponding to custom Tabler symbols in the loaded
   * `focusTimer` (`100ms` delay): Triggers an immediate focus request.
   * `focusTimerSlow` (`300ms` delay): Retries focus once the interface has fully rendered.
   * If focus is ever lost, clicking the background or closing a dropdown automatically returns active focus to the password field (`pwField`).
+
+---
+
+## 36. Universal Package Manager Bridge (`sysupdate` & `sysfind`)
+
+To streamline packages and system updates between different Linux conventions (specifically bridging legacy Arch Linux aliases to Fedora's `dnf5` and `flatpak`), we have implemented a unified package bridge.
+
+### 36.1 Command Utilities
+These wrapper scripts live in `~/.local/bin/` and automatically route execution to the correct tools:
+*   **`sysupdate`** (`~/.local/bin/sysupdate`): 
+    *   Detects the system's package manager (`dnf5`, `dnf`, `pacman/yay/paru`, or `apt`).
+    *   Runs the native upgrade commands (e.g. `dnf5 upgrade` on Fedora).
+    *   Runs Flatpak upgrades if Flatpak is installed (`flatpak update -y`).
+    *   Sends desktop notifications via `notify-send` when the update process starts and ends.
+*   **`sysfind <query>`** (`~/.local/bin/sysfind`):
+    *   Fuzzy-searches both the system repositories (using `dnf5 search` or equivalent) and flatpak applications simultaneously.
+
+### 36.2 Shell Integration
+The shell configs (`~/.config/fish/config.fish` and `~/.zshrc`) are configured to route common tasks to the bridge:
+*   `update` -> runs `sysupdate`
+*   `findpkg` -> runs `sysfind <package_name>`
+*   `big` -> uses a native, high-performance query (`rpm -qa --queryformat ...`) to list the top 50 largest installed packages on your system.
+
+---
+
+## 37. Wayland Clipboard Persistence Service (`wl-clip-persist`)
+
+Under Wayland, copied text/data is natively tied to the lifecycle of the window that copied it. When that application is closed, the clipboard content is lost.
+
+To resolve this, we compiled and installed `wl-clip-persist` from source and set up a managed background daemon.
+
+### 37.1 Daemon Configuration & Management
+*   **Binary Location:** `~/.local/bin/wl-clip-persist`
+*   **Systemd User Service:** `~/.config/systemd/user/wl-clip-persist.service`
+*   **Auto-start:** Started automatically on session login via systemd target dependencies.
+
+To verify or manage the service manually:
+```bash
+# Check service status
+systemctl --user status wl-clip-persist.service
+
+# Restart service
+systemctl --user restart wl-clip-persist.service
+```
+
+---
+
+## 38. Dedicated GPU Launcher Wrapper (`nvrun`)
+
+Your workstation is a hybrid graphics setup (Intel UHD integrated graphics + NVIDIA RTX 4050 mobile dedicated graphics). By default, applications run on the low-power Intel graphics to conserve energy and keep the system cool.
+
+### 38.1 Launching Demanding Applications
+For heavy 3D workloads, gaming, or GPU-intensive software, you can prepend **`nvrun`** before the launch command in the terminal:
+```bash
+nvrun <application-name>
+
+# Example: Run blender on the RTX 4050
+nvrun blender
+```
+
+### 38.2 Under the Hood
+The `nvrun` wrapper script (`~/.local/bin/nvrun`) exports Wayland/NVIDIA render offload targets:
+```bash
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __VK_LAYER_NV_optimus=NVIDIA_only
+export DRI_PRIME=1
+```
+This forces the graphics server to steer the application's rendering pipeline directly onto the RTX 4050 GPU.

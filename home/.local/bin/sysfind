@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# sysfind — Universal package finder
+
+if [ $# -lt 1 ]; then
+    echo "Usage: sysfind <package_name>"
+    exit 1
+fi
+
+query="$1"
+
+if command -v dnf5 >/dev/null; then
+    dnf5 search "$query"
+elif command -v dnf >/dev/null; then
+    dnf search "$query"
+elif command -v yay >/dev/null; then
+    yay -Ss "$query"
+elif command -v paru >/dev/null; then
+    paru -Ss "$query"
+elif command -v pacman >/dev/null; then
+    pacman -Ss "$query"
+elif command -v apt-get >/dev/null; then
+    apt-cache search "$query"
+else
+    echo "No supported package manager detected."
+    exit 1
+fi
+
+if command -v flatpak >/dev/null; then
+    echo -e "\n=== Flatpak Search ==="
+    flatpak search "$query"
+fi
