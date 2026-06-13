@@ -471,7 +471,7 @@ Singleton {
     }
     const isImage = mime && mime.startsWith("image/");
     const typeArg = isImage ? ` --type ${mime}` : "";
-    const pasteKeys = isImage ? "wtype -M ctrl -k v" : "wtype -M ctrl v";
+    const pasteKeys = isImage ? "sleep 0.15 && wtype -M ctrl -k v" : "sleep 0.15 && wtype -M ctrl v";
     const cmd = `cliphist decode ${id} | wl-copy${typeArg} && ${pasteKeys}`;
     pasteProc.command = ["sh", "-c", cmd];
     pasteProc.running = true;
@@ -481,7 +481,7 @@ Singleton {
     if (!text)
       return;
     const escaped = text.replace(/'/g, "'\\''");
-    const cmd = `printf '%s' '${escaped}' | wl-copy && wtype -M ctrl v`;
+    const cmd = `printf '%s' '${escaped}' | wl-copy && sleep 0.15 && wtype -M ctrl v`;
     pasteProc.command = ["sh", "-c", cmd];
     pasteProc.running = true;
   }

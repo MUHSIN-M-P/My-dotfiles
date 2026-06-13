@@ -607,7 +607,15 @@ Item {
 
   function spawn(command) {
     try {
-      Quickshell.execDetached(command);  // (local) skip hyprctl indirection for faster launch
+      const escapedArgs = command.map(arg => {
+        if (/[ \t\n"'`$&|<>#*?()[\]{}^~;]/.test(arg)) {
+          return "'" + arg.replace(/'/g, "'\\''") + "'";
+        }
+        return arg;
+      });
+      const cmdStr = escapedArgs.join(" ");
+      Logger.d("HyprlandService", "Spawning via Hyprland dispatch: exec " + cmdStr);
+      Hyprland.dispatch(`exec ${cmdStr}`);
     } catch (e) {
       Logger.e("HyprlandService", "Failed to spawn command:", e);
     }
