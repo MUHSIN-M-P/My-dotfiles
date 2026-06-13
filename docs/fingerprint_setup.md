@@ -30,6 +30,8 @@ This document details the reverse-engineering, diagnostics, and customized compi
    Normally, when you touched the sensor with an unregistered/wrong finger, the driver returned `ELANMOC2_RESP_NOT_ENROLLED` which was mapped to a fatal `FP_DEVICE_ERROR_DATA_NOT_FOUND` error. This caused `fprintd` to believe the fingerprint template was completely missing from the chip, triggering an automatic "cleanup" that wiped the stored enrollment database!
    
    **The Patch:** We updated `elanmoc2.c` to map `ELANMOC2_RESP_NOT_ENROLLED` to a recoverable `FP_DEVICE_RETRY_GENERAL` retry event with the message `"Fingerprint not recognized"`. Wrong touches now fail cleanly with a normal retry/mismatch rather than deleting your database!
+6. **Instant Cancellation and Reduced USB Timeout:** 
+   We introduced `elanmoc2_cmd_send_sync_timeout` to run commands with custom timeouts. `elanmoc2_cancel` was updated to send the `cmd_abort` packet with a fast 100ms timeout, ensuring it does not block the PAM stack. In addition, we reduced the bulk USB read timeout `ELANMOC2_USB_RECV_TIMEOUT` from 10,000ms to 2,000ms. This prevents the driver's polling loops from hanging the PAM helper thread when fallback password input is typed.
 
 ---
 
@@ -287,15 +289,119 @@ This means the fingerprint sensor is active immediately when the lockscreen appe
 ### 3. Login Screen (SDDM) Coexistence (Instant Auto-Fingerprint)
 To configure SDDM so that the fingerprint scanner is **automatically active** as soon as the screen turns on, while allowing you to type your password at any time:
 
-Run this command in your terminal to update `/etc/pam.d/sddm`:
+## 🔐 Dual-Auth Configuration (Password & Fingerprint Coexistence)
+
+To ensure that you can use **either** your fingerprint **or** your password seamlessly across all system contexts, follow these configurations:
+
+### ⚠️ Critical First Step: Restore Custom libfprint Symlink
+
+After any Fedora update, the system may reset the `libfprint-2.so.2` symlink back to the stock (incompatible) library. **Always verify this first when fingerprint stops working:**
+
 ```bash
-sudo tee /etc/pam.d/sddm << 'EOF'
+readlink /usr/lib64/libfprint-2.so.2
+# Must show: libfprint-2.so.2.0.0
+# If it shows: libfprint-2.so.2.0.0.bak  ← BROKEN!
+
+# Fix:
+sudo ln -sf libfprint-2.so.2.0.0 /usr/lib64/libfprint-2.so.2
+sudo systemctl restart fprintd.service
+```
+
+A **systemd service** has been installed to restore this automatically on every boot:
+```bash
+# Already installed at: /etc/systemd/system/libfprint-custom.service
+sudo systemctl enable libfprint-custom.service
+```
+
+---
+
+### 1. Authselect (System-Wide PAM Foundation)
+
+The `local` authselect profile with `with-fingerprint` feature is required:
+
+```bash
+sudo authselect select local with-fingerprint --force
+```
+
+Verify:
+```bash
+authselect current
+# Should show: Profile ID: local | Enabled features: with-fingerprint
+```
+
+---
+
+### 2. Terminal / Sudo (Fingerprint → Enter to bypass)
+
+**Behavior:**
+- 🫆 Scan finger → authenticated instantly
+- ⌨️ Press `Enter` → **~1 second wait** → password prompt (1s is PAM minimum)
+
+**`/etc/pam.d/sudo`:**
+```text
+#%PAM-1.0
+auth       required     pam_env.so
+auth       sufficient   pam_fprintd.so max-tries=1 timeout=1
+auth       sufficient   pam_unix.so nullok try_first_pass
+auth       required     pam_deny.so
+
+account    include      system-auth
+password   include      system-auth
+session    optional     pam_keyinit.so revoke
+session    required     pam_limits.so
+session    include      system-auth
+```
+
+> **Note:** `pam_faildelay.so` was intentionally removed from this file (it caused a 2-second penalty). The `timeout=1` on fprintd is the minimum allowed by PAM; there is no true "instant" bypass possible via keyboard without a custom PAM module.
+
+To apply:
+```bash
+sudo tee /etc/pam.d/sudo << 'EOF'
+#%PAM-1.0
+auth       required     pam_env.so
+auth       sufficient   pam_fprintd.so max-tries=1 timeout=1
+auth       sufficient   pam_unix.so nullok try_first_pass
+auth       required     pam_deny.so
+
+account    include      system-auth
+password   include      system-auth
+session    optional     pam_keyinit.so revoke
+session    required     pam_limits.so
+session    include      system-auth
+EOF
+```
+
+---
+
+### 3. Lockscreen (Noctalia QML Lockscreen)
+
+The Noctalia lockscreen uses `Quickshell.Services.Pam` and calls `fprintd-verify` internally via the `LockContext.qml` logic.
+
+Ensure these Noctalia settings are enabled in `~/.config/noctalia/settings.json`:
+- `"general.allowPasswordWithFprintd": true`
+- `"general.autoStartAuth": true`
+
+**Behavior:** Fingerprint scanner is active immediately on lock. Typing any character aborts fprintd and switches to password mode.
+
+The lockscreen uses `/etc/pam.d/login` (auto-detected) which inherits from `system-auth` (fprintd enabled).
+
+---
+
+### 4. Login Screen / SDDM
+
+**Critical PAM order:** `pam_unix` must use `[success=2 default=ignore]` (NOT `sufficient`) so that:
+- If the **password field is empty** + Enter → unix fails (ignored) → **fprintd activates**
+- If a **password is typed** + Enter → unix authenticates directly (skips fprintd)
+
+**`/etc/pam.d/sddm`:**
+```text
+#%PAM-1.0
 auth     [success=done ignore=ignore default=bad] pam_selinux_permit.so
-auth     [success=2 default=ignore]                   pam_unix.so try_first_pass nullok
-auth     sufficient                                   pam_fprintd.so max-tries=1
-auth     substack                                     password-auth
--auth    optional                                     pam_gnome_keyring.so
-auth     include                                      postlogin
+auth     [success=2 default=ignore]               pam_unix.so try_first_pass nullok
+auth     sufficient                               pam_fprintd.so max-tries=3 timeout=30
+auth     substack                                 password-auth
+auth     optional                                 pam_gnome_keyring.so
+auth     include                                  postlogin
 
 account     required      pam_nologin.so
 account     include       password-auth
@@ -309,13 +415,114 @@ session     required      pam_selinux.so open
 session     optional      pam_keyinit.so force revoke
 session     required      pam_namespace.so
 session     include       password-auth
--session    optional      pam_gnome_keyring.so auto_start
--session    optional      pam_kwallet5.so auto_start
--session    optional      pam_kwallet.so auto_start
+session     optional      pam_gnome_keyring.so auto_start
+session     include       postlogin
+```
+
+**How to log in:**
+- 🫆 **Fingerprint:** Press Enter with empty password field → scan finger
+- ⌨️ **Password:** Type password → press Enter (skips fprintd entirely)
+
+**Keyring unlock:** `pam_gnome_keyring.so auto_start` in the session stack unlocks the keyring when logging in with password. When logging in via fingerprint, the keyring may prompt once for the password — this is normal as the keyring can only be decrypted with the user password.
+
+To apply:
+```bash
+sudo tee /etc/pam.d/sddm << 'EOF'
+#%PAM-1.0
+auth     [success=done ignore=ignore default=bad] pam_selinux_permit.so
+auth     [success=2 default=ignore]               pam_unix.so try_first_pass nullok
+auth     sufficient                               pam_fprintd.so max-tries=3 timeout=30
+auth     substack                                 password-auth
+auth     optional                                 pam_gnome_keyring.so
+auth     include                                  postlogin
+
+account     required      pam_nologin.so
+account     include       password-auth
+
+password    include       password-auth
+
+session     required      pam_selinux.so close
+session     required      pam_loginuid.so
+-session    optional      pam_ck_connector.so
+session     required      pam_selinux.so open
+session     optional      pam_keyinit.so force revoke
+session     required      pam_namespace.so
+session     include       password-auth
+session     optional      pam_gnome_keyring.so auto_start
 session     include       postlogin
 EOF
 ```
 
-*   **How to log in on SDDM:** 
-    *   **To use fingerprint:** Simply touch the scanner immediately—no keys required!
-    *   **To use password:** Just start typing your password and press **`Enter`**. SDDM will cancel the fingerprint scan and authenticate you.
+---
+
+### 5. pkexec / Polkit Agent (Fingerprint + Password)
+
+> **Architecture Note:** PAM is serially sequential. True simultaneous finger+password at the PAM level is managed cleanly by having `pam_fprintd.so` run first, followed by `pam_unix.so` with `try_first_pass`. Running a parallel `fprintd-verify` process in the GUI agent causes device conflicts and intermittent authentication failures. Our solution relies entirely on the PAM stack's `pam_fprintd.so` to communicate with the reader, resolving all device contention.
+
+**`/etc/pam.d/polkit-1`:**
+```text
+#%PAM-1.0
+auth       required     pam_env.so
+auth       sufficient   pam_fprintd.so max-tries=1 timeout=60
+auth       sufficient   pam_unix.so nullok try_first_pass
+auth       required     pam_deny.so
+
+account    include      system-auth
+password   include      system-auth
+session    include      system-auth
+```
+
+To apply:
+```bash
+sudo tee /etc/pam.d/polkit-1 << 'EOF'
+#%PAM-1.0
+auth       required     pam_env.so
+auth       sufficient   pam_fprintd.so max-tries=1 timeout=60
+auth       sufficient   pam_unix.so nullok try_first_pass
+auth       required     pam_deny.so
+
+account    include      system-auth
+password   include      system-auth
+session    include      system-auth
+EOF
+```
+
+**Noctalia Polkit Agent Plugin (`~/.config/noctalia/plugins/polkit-agent/`):**
+
+The plugin is designed to provide a **terminal-style fingerprint-first UX**:
+
+1. Dialog opens in **Fingerprint Mode** — showing a pulsing fingerprint icon with animated glow rings. The system's fingerprint sensor is activated directly by `pam_fprintd.so` in the PAM stack.
+2. **Scan finger** → PAM stack succeeds → Quickshell agent window closes automatically.
+3. **Press Enter** (or start typing) → instantly switches to **Password Mode**.
+4. **Type password & press Enter** → submitted to PAM stack. This automatically aborts `pam_fprintd.so` and immediately authenticates via `pam_unix.so` using `try_first_pass` with zero delay.
+5. In Password Mode, the **"← Fingerprint"** back button returns the UI to fingerprint mode.
+
+**Key bug fixes:**
+- Fixed a crash by using `onAuthenticationRequestStarted` in `Main.qml` (ensuring `flow` is fully initialized before creating the window).
+- Fixed a premature password fallback by disabling automatic password switching when `flow.isResponseRequired` fires at startup.
+- Fixed device conflicts and random verification errors by removing the parallel QML-managed `fprintd-verify` process. Log messages from `pam_fprintd.so` are seamlessly surfaced via `flow.supplementaryMessage`.
+
+---
+
+### 6. Re-Enrolling Fingerprints
+
+If fingerprint stops working, always **wipe and re-enroll** to clear corrupted on-chip flash data:
+
+```bash
+# Wipe all stored enrollments
+sudo fprintd-delete ldzbeta
+sudo systemctl restart fprintd.service
+
+# Re-enroll (always use sudo to avoid Polkit permission issues under Hyprland)
+sudo fprintd-enroll ldzbeta
+
+# Verify
+fprintd-verify ldzbeta
+# Should output: Verify result: verify-match (done)
+```
+
+**Enrollment Tips:**
+- Place finger on sensor ~8 times from slightly different angles
+- The `enroll-finger-not-centered` message is harmless — enrollment completes anyway
+- If you see `enroll-no-space`, the sensor flash is full — run `fprintd-delete` first
+

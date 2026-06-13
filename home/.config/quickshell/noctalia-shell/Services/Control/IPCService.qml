@@ -723,6 +723,17 @@ Singleton {
                                               batteryPanel?.toggle(null, "Battery");
                                             });
     }
+
+    function triggerLowWarning(title: string, desc: string, icon: string) {
+      BatteryService.lowBatteryWarningTitle = title || "Battery Alert";
+      BatteryService.lowBatteryWarningDesc = desc || "Your PC is running low on power. Please plug in or choose another power source now.";
+      BatteryService.lowBatteryWarningIcon = icon || "battery-exclamation";
+      BatteryService.showLowBatteryWarning = true;
+    }
+
+    function dismissLowWarning() {
+      BatteryService.showLowBatteryWarning = false;
+    }
   }
 
   IpcHandler {

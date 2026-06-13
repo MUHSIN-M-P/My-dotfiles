@@ -44,6 +44,7 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 36. [Universal Package Manager Bridge (sysupdate & sysfind)](#36-universal-package-manager-bridge-sysupdate--sysfind)
 37. [Wayland Clipboard Persistence Service (wl-clip-persist)](#37-wayland-clipboard-persistence-service-wl-clip-persist)
 38. [Dedicated GPU Launcher Wrapper (nvrun)](#38-dedicated-gpu-launcher-wrapper-nvrun)
+39. [Elan Match-on-Chip Fingerprint Setup](#39-elan-match-on-chip-fingerprint-setup)
 
 ---
 
@@ -643,6 +644,37 @@ To achieve **instant, zero-delay logins** while preserving battery longevity, No
    * If the user preferred profile was **`power-saver`** (Silent mode), it automatically throttles down to save battery and reduce fan noise.
 
 This dual-state optimization delivers the best of both worlds: **unthrottled, instantaneous desktop loads** with **silent, long-lasting battery life** during normal desktop use.
+
+### 18.2 Noctalia Persistent Low-Battery Alert
+
+To ensure critical battery conditions are never missed, Noctalia replaces default transient toast notifications with a persistent, fullscreen, and modal-style battery alert overlay when low battery thresholds are reached:
+
+* **Modal Focus:** Utilizes exclusive keyboard grabbing (`WlrKeyboardFocus.Exclusive`) and backdrop dimming to temporarily lock interaction with the rest of the desktop, prompting immediate action.
+* **Dismissal Security:** The overlay blocks normal desktop usage and is immune to accidental keypresses. Typing typical characters (including `Space`) does not dismiss the modal. It will only unload if the user explicitly clicks the **"OK"** button or presses **`Enter`**, **`Return`**, or **`Escape`**.
+* **Auto-Dismissal:** If you connect a charger and the battery status changes to charging, or if the battery level rises above the warning threshold, the alert automatically unloads itself.
+* **Manual Testing & Triggering:** You can manually invoke and test the battery warning dialog using the exposed IPC endpoints:
+  ```bash
+  # Trigger the modal manually (title, description, and icon name are optional)
+  qs ipc call battery triggerLowWarning "Battery Low Warning" "Your system battery is at 10%. Please connect a charger immediately." "battery-exclamation"
+
+  # Programmatically dismiss the modal
+  qs ipc call battery dismissLowWarning
+  ```
+
+### 18.3 Battery Life Optimizations (Custom TuneD Profiles)
+
+To improve battery runtimes under Linux relative to Windows, we run customized variations of standard TuneD profiles configured to automatically engage aggressive low-power hardware tuning on battery:
+
+1. **Custom Mappings (`/etc/tuned/ppd.conf`):**
+   * Switching the system to `Power saver` (Silent mode) activates the custom `powersave-noctalia` profile.
+   * Running on battery under `Balanced` mode dynamically activates the custom `balanced-battery-noctalia` profile.
+
+2. **Advanced Hardware Optimization Controls:**
+   * **PCIe ASPM Policy:** Forced to `powersave` mode to scale down high-speed serial bus links when idle.
+   * **PCI Runtime PM:** Enforces dynamic sleep/suspend controls (`auto`) for all idle PCI controllers, including the dedicated NVIDIA GPU, HD audio, and network adapters.
+   * **USB Autosuspend:** Suspends power to all internal and external USB controllers (`USB_AUTOSUSPEND=1`) when inactive.
+   * **Wi-Fi Power Saving:** Automatically activates kernel-level Wi-Fi power-save modes.
+   * **SATA ALPM:** Configured to save disk interface power (`min_power` on power-saver, `med_power_with_dipm` on balanced).
 
 ---
 
@@ -1433,3 +1465,24 @@ export __VK_LAYER_NV_optimus=NVIDIA_only
 export DRI_PRIME=1
 ```
 This forces the graphics server to steer the application's rendering pipeline directly onto the RTX 4050 GPU.
+
+---
+
+## 39. Elan Match-on-Chip Fingerprint Setup
+
+Your laptop features an **Elan Match-on-Chip 2 (MOC2) fingerprint reader** (`04f3:0c90`) integrated system-wide into the Pluggable Authentication Modules (PAM) stack.
+
+### 39.1 Key Features & Workflow
+*   **Terminal & Lock Screen Logins:** Type your password or touch the fingerprint scanner. The PAM stack evaluates both simultaneously.
+*   **Polkit Authentication agent:** The custom Noctalia Polkit window (`pkexec` popup) has a unified design. Both the fingerprint scanner icon and the password entry field are displayed at the same time. The password text field is focused on startup, allowing you to instantly type your password or scan your fingerprint with zero delay.
+*   **Sub-Second Password Fallback:** The custom compiled `libfprint` driver aborts any active fingerprint scans in under **100ms** when you start typing your password, preventing the PAM stack from hanging or freezing.
+
+### 39.2 Technical Documentation
+For full details on the custom patches implemented in the Elan driver (including buffer expansion, signature reconstruction, wrong-touch databases preservation, and cancellation timeouts), refer to:
+*   [docs/fingerprint_setup.md](file:///home/ldzbeta/dotfiles/docs/fingerprint_setup.md) — Comprehensive build guide and reverse-engineering logs.
+*   [docs/latency_fix_details.md](file:///home/ldzbeta/dotfiles/docs/latency_fix_details.md) — Low-level analysis of the 100ms and 2-second timeout optimizations.
+
+To restart the fingerprint daemon:
+```bash
+sudo systemctl restart fprintd.service
+```

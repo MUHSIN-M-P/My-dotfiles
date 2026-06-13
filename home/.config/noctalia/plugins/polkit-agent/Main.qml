@@ -15,12 +15,18 @@ Item {
 
     PolkitAgent {
         id: agent
-        
-        onIsActiveChanged: {
-            if (isActive) {
-                openWindow()
-            } else {
+
+        // Use onAuthenticationRequestStarted - fired AFTER flow is populated
+        onAuthenticationRequestStarted: {
+            openWindow()
+        }
+
+        // Use flowChanged to handle flow teardown
+        onFlowChanged: {
+            if (agent.flow === null) {
                 closeWindow()
+            } else if (window !== null) {
+                window.flow = agent.flow
             }
         }
     }
@@ -29,10 +35,19 @@ Item {
 
     function openWindow() {
         if (window === null) {
-            window = Qt.createComponent("PolkitWindow.qml").createObject(root, {
+            var comp = Qt.createComponent("PolkitWindow.qml");
+            if (comp.status === Component.Error) {
+                console.error("[PolkitAgent] PolkitWindow.qml compile error:", comp.errorString());
+                return;
+            }
+            window = comp.createObject(root, {
                 flow: agent.flow,
                 pluginApi: Qt.binding(function() { return root.pluginApi })
             });
+            if (window === null) {
+                console.error("[PolkitAgent] createObject returned null:", comp.errorString());
+                return;
+            }
             window.visible = true;
         } else {
             window.flow = agent.flow

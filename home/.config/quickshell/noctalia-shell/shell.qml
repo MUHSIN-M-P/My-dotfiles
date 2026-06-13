@@ -146,6 +146,7 @@ ShellRoot {
 
       LockScreen {}
       FadeOverlay {}
+      BatteryWarningOverlay {}
 
       // Settings window mode (single window across all monitors)
       SettingsPanelWindow {}

@@ -72,6 +72,11 @@ Singleton {
 
   property var _hasNotified: ({})
 
+  property bool showLowBatteryWarning: false
+  property string lowBatteryWarningTitle: ""
+  property string lowBatteryWarningDesc: ""
+  property string lowBatteryWarningIcon: ""
+
   function findDevice(nativePath) {
     if (!nativePath || nativePath === "__default__" || nativePath === "DisplayDevice") {
       return _laptopBattery;
@@ -305,11 +310,17 @@ Singleton {
     if (charging || pluggedIn) {
       _hasNotified[deviceKey].low = false;
       _hasNotified[deviceKey].critical = false;
+      if (device && device.isLaptopBattery) {
+        showLowBatteryWarning = false;
+      }
     }
 
     if (percentage > warningThreshold) {
       _hasNotified[deviceKey].low = false;
       _hasNotified[deviceKey].critical = false;
+      if (device && device.isLaptopBattery) {
+        showLowBatteryWarning = false;
+      }
     } else if (percentage > criticalThreshold) {
       _hasNotified[deviceKey].critical = false;
     }
@@ -340,8 +351,15 @@ Singleton {
       title = title + " " + name;
     }
 
-    // Only 'showNotice' supports custom icons
-    ToastService.showNotice(title, desc, icon, 6000);
+    if (device && device.isLaptopBattery) {
+      lowBatteryWarningTitle = title;
+      lowBatteryWarningDesc = desc;
+      lowBatteryWarningIcon = icon;
+      showLowBatteryWarning = true;
+    } else {
+      // Only 'showNotice' supports custom icons
+      ToastService.showNotice(title, desc, icon, 6000);
+    }
   }
 
   Instantiator {
