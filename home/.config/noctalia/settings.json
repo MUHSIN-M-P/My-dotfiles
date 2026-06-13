@@ -407,6 +407,37 @@
                         "showBackground": true,
                         "x": 552,
                         "y": 312
+                    },
+                    {
+                        "defaultSettings": {
+                            "todos": [],
+                            "pages": [
+                                {
+                                    "id": 0,
+                                    "name": "General"
+                                }
+                            ],
+                            "current_page_id": 0,
+                            "count": 0,
+                            "completedCount": 0,
+                            "showCompleted": true,
+                            "showBackground": true,
+                            "isExpanded": false,
+                            "useCustomColors": false,
+                            "priorityColors": {
+                                "high": "#f44336",
+                                "medium": "#2196f3",
+                                "low": "#9e9e9e"
+                            },
+                            "exportPath": "~/Documents",
+                            "exportFormat": "markdown",
+                            "exportEmptySections": false
+                        },
+                        "id": "plugin:todo",
+                        "scale": 1.0,
+                        "showBackground": true,
+                        "x": 24,
+                        "y": 96
                     }
                 ]
             }
@@ -573,7 +604,7 @@
         "nightTemp": "4000"
     },
     "noctaliaPerformance": {
-        "disableDesktopWidgets": true,
+        "disableDesktopWidgets": false,
         "disableWallpaper": true
     },
     "notifications": {
