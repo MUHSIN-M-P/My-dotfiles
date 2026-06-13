@@ -226,6 +226,14 @@ Singleton {
   Process {
     id: pasteProc
     stdout: StdioCollector {}
+    stderr: StdioCollector {}
+    onExited: (exitCode, exitStatus) => {
+      Logger.d("ClipboardService", `pasteProc command: ${command.join(" ")}`);
+      Logger.d("ClipboardService", `pasteProc exited with code: ${exitCode}, status: ${exitStatus}`);
+      if (exitCode !== 0) {
+        Logger.e("ClipboardService", `pasteProc stderr: ${stderr.text}`);
+      }
+    }
   }
 
   Process {
