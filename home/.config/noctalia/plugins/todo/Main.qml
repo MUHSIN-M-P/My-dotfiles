@@ -81,6 +81,8 @@ Item {
       rawPages = pluginApi.pluginSettings.pages.slice();
 
       // Data migration: add missing fields to existing todos
+      var today = new Date().toISOString().split("T")[0];
+      var changed = false;
       for (var i = 0; i < rawTodos.length; i++) {
         if (rawTodos[i].pageId === undefined)
           rawTodos[i].pageId = 0;
@@ -89,8 +91,22 @@ Item {
         }
         if (rawTodos[i].details === undefined)
           rawTodos[i].details = "";
+        if (rawTodos[i].daily === undefined) {
+          rawTodos[i].daily = false;
+        }
+        if (rawTodos[i].daily && rawTodos[i].completed && rawTodos[i].completedAt) {
+          var compDay = rawTodos[i].completedAt.split("T")[0];
+          if (compDay !== today) {
+            rawTodos[i].completed = false;
+            rawTodos[i].completedAt = "";
+            changed = true;
+          }
+        }
       }
 
+      if (changed) {
+        pluginApi.pluginSettings.todos = rawTodos.slice();
+      }
       pluginApi.saveSettings();
     }
   }
@@ -193,6 +209,11 @@ Item {
     function setTodoText(id: string, text: string) {
       updateTodo(id, {
                    text: text
+                 }) ? ToastService.showNotice(pluginApi.tr("main.updated_todo")) : ToastService.showError(pluginApi.tr("main.error_update_failed"));
+    }
+    function setTodoDaily(id: string, daily: bool) {
+      updateTodo(id, {
+                   daily: daily
                  }) ? ToastService.showNotice(pluginApi.tr("main.updated_todo")) : ToastService.showError(pluginApi.tr("main.error_update_failed"));
     }
     function toggleTodo(id: string) {
@@ -298,10 +319,12 @@ Item {
       id: Date.now(),
       text: text,
       completed: false,
+      completedAt: "",
       createdAt: new Date().toISOString(),
       pageId: pageId,
       priority: priority,
-      details: ""
+      details: "",
+      daily: false
     };
 
     var insertIndex = rawTodos.length;
@@ -327,12 +350,20 @@ Item {
 
     if (updates.text !== undefined)
       rawTodos[index].text = updates.text;
-    if (updates.completed !== undefined)
+    if (updates.completed !== undefined) {
       rawTodos[index].completed = updates.completed;
+      if (updates.completed) {
+        rawTodos[index].completedAt = new Date().toISOString();
+      } else {
+        rawTodos[index].completedAt = "";
+      }
+    }
     if (updates.priority !== undefined)
       rawTodos[index].priority = updates.priority;
     if (updates.details !== undefined)
       rawTodos[index].details = updates.details;
+    if (updates.daily !== undefined)
+      rawTodos[index].daily = updates.daily;
 
     // If completion status changed, reorder todos
     if (updates.completed !== undefined && oldCompleted !== updates.completed) {

@@ -1159,6 +1159,7 @@ Item {
     property int todoPageId: 0
     property string todoPriority: "medium"
     property string todoDetails: ""
+    property bool todoDaily: false
 
     x: (parent.width - width) / 2
     y: (parent.height - height) / 2
@@ -1607,6 +1608,36 @@ Item {
               }
             }
 
+            // Daily task
+            RowLayout {
+              spacing: Style.marginM
+              Layout.fillWidth: true
+
+              NIcon {
+                icon: "repeat"
+                pointSize: Style.fontSizeS
+                color: Color.mOnSurfaceVariant
+              }
+
+              NText {
+                text: "Daily Task"
+                font.pointSize: Style.fontSizeS
+                color: Color.mOnSurfaceVariant
+                Layout.preferredWidth: 78 * Style.uiScaleRatio
+                Layout.alignment: Qt.AlignVCenter
+              }
+
+              NToggle {
+                checked: detailDialog.todoDaily
+                onToggled: checked => {
+                  updateTodo(detailDialog.todoId, {
+                               daily: checked
+                             });
+                  detailDialog.todoDaily = checked;
+                }
+              }
+            }
+
             // Created date
             RowLayout {
               spacing: Style.marginM
@@ -1769,6 +1800,7 @@ Item {
     detailDialog.todoPageId = todo.pageId;
     detailDialog.todoPriority = todo.priority;
     detailDialog.todoDetails = todo.details || "";
+    detailDialog.todoDaily = todo.daily || false;
 
     detailDialog.open();
   }
@@ -1795,7 +1827,8 @@ Item {
           createdAt: todo.createdAt,
           pageId: todo.pageId,
           priority: todo.priority,
-          details: todo.details
+          details: todo.details,
+          daily: todo.daily || false
         };
 
         // Add to filtered model if applicable
