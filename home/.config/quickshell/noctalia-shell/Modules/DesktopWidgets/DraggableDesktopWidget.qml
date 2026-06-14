@@ -27,6 +27,8 @@ Item {
   property bool roundedCorners: widgetData.roundedCorners !== undefined ? widgetData.roundedCorners : (_metadata?.roundedCorners ?? true)
 
   property real widgetScale: 1.0
+  property real widgetScaleX: 1.0
+  property real widgetScaleY: 1.0
   property real minScale: 0.5
   property real maxScale: 5.0
 
@@ -103,7 +105,11 @@ Item {
     property real initialHeight: 0
     property point initialMousePos: Qt.point(0, 0)
     property real initialScale: 1.0
+    property real initialScaleX: 1.0
+    property real initialScaleY: 1.0
     property real lastScale: 1.0
+    property real lastScaleX: 1.0
+    property real lastScaleY: 1.0
     // Locks operation type to prevent switching between drag/scale mid-operation
     property string operationType: ""  // "drag" or "scale" or ""
   }
@@ -113,6 +119,52 @@ Item {
       return coord;
     }
     return Math.round(coord / root.gridSize) * root.gridSize;
+  }
+
+  function snapScaleXToGrid(scale) {
+    if (!Settings.data.desktopWidgets.gridSnap || !Settings.data.desktopWidgets.gridSnapScale) {
+      return scale;
+    }
+
+    var initialWidth = internal.initialWidth;
+    var initialScaleX = internal.initialScaleX;
+    if (initialWidth <= 0 || initialScaleX <= 0) {
+      return scale;
+    }
+
+    var baseWidth = initialWidth / initialScaleX;
+    var resultingWidth = baseWidth * scale;
+    var snappedWidth = root.snapToGrid(resultingWidth);
+
+    if (snappedWidth < root.gridSize) {
+      snappedWidth = root.gridSize;
+    }
+
+    var snappedScale = snappedWidth / baseWidth;
+    return Math.max(minScale, Math.min(maxScale, snappedScale));
+  }
+
+  function snapScaleYToGrid(scale) {
+    if (!Settings.data.desktopWidgets.gridSnap || !Settings.data.desktopWidgets.gridSnapScale) {
+      return scale;
+    }
+
+    var initialHeight = internal.initialHeight;
+    var initialScaleY = internal.initialScaleY;
+    if (initialHeight <= 0 || initialScaleY <= 0) {
+      return scale;
+    }
+
+    var baseHeight = initialHeight / initialScaleY;
+    var resultingHeight = baseHeight * scale;
+    var snappedHeight = root.snapToGrid(resultingHeight);
+
+    if (snappedHeight < root.gridSize) {
+      snappedHeight = root.gridSize;
+    }
+
+    var snappedScale = snappedHeight / baseHeight;
+    return Math.max(minScale, Math.min(maxScale, snappedScale));
   }
 
   function snapScaleToGrid(scale) {
@@ -263,9 +315,20 @@ Item {
   // This prevents blurry text at fractional scale values
 
   Component.onCompleted: {
-    // Initialize scale from widgetData when component is first created
-    if (widgetData && widgetData.scale !== undefined) {
-      widgetScale = widgetData.scale;
+    if (widgetData) {
+      if (widgetData.scaleX !== undefined) {
+        widgetScaleX = widgetData.scaleX;
+      } else if (widgetData.scale !== undefined) {
+        widgetScaleX = widgetData.scale;
+      }
+      if (widgetData.scaleY !== undefined) {
+        widgetScaleY = widgetData.scaleY;
+      } else if (widgetData.scale !== undefined) {
+        widgetScaleY = widgetData.scale;
+      }
+      if (widgetData.scale !== undefined) {
+        widgetScale = widgetData.scale;
+      }
     }
   }
 
@@ -273,11 +336,28 @@ Item {
     if (!internal.isDragging && !internal.isScaling) {
       internal.baseX = (widgetData && widgetData.x !== undefined) ? widgetData.x : defaultX;
       internal.baseY = (widgetData && widgetData.y !== undefined) ? widgetData.y : defaultY;
-      if (widgetData && widgetData.scale !== undefined) {
-        widgetScale = widgetData.scale;
-      } else if (widgetData) {
-        // If widgetData exists but scale is not set, default to 1.0
-        widgetScale = 1.0;
+      if (widgetData) {
+        if (widgetData.scaleX !== undefined) {
+          widgetScaleX = widgetData.scaleX;
+        } else if (widgetData.scale !== undefined) {
+          widgetScaleX = widgetData.scale;
+        } else {
+          widgetScaleX = 1.0;
+        }
+
+        if (widgetData.scaleY !== undefined) {
+          widgetScaleY = widgetData.scaleY;
+        } else if (widgetData.scale !== undefined) {
+          widgetScaleY = widgetData.scale;
+        } else {
+          widgetScaleY = 1.0;
+        }
+
+        if (widgetData.scale !== undefined) {
+          widgetScale = widgetData.scale;
+        } else {
+          widgetScale = 1.0;
+        }
       }
     }
   }
@@ -582,7 +662,11 @@ Item {
                      internal.operationType = "scale";
                      internal.isScaling = true;
                      internal.initialScale = root.widgetScale;
+                     internal.initialScaleX = root.widgetScaleX;
+                     internal.initialScaleY = root.widgetScaleY;
                      internal.lastScale = root.widgetScale;
+                     internal.lastScaleX = root.widgetScaleX;
+                     internal.lastScaleY = root.widgetScaleY;
                      internal.initialWidth = root.width;
                      internal.initialHeight = root.height;
                    }
@@ -600,13 +684,19 @@ Item {
                                // Scale sensitivity: pixels of drag per 1.0 scale change
                                var sensitivity = 150;
                                var scaleDelta = diagonalDelta / sensitivity;
-                               var newScale = Math.max(root.minScale, Math.min(root.maxScale, internal.initialScale + scaleDelta));
+                               
+                               var initialScale = Math.max(internal.initialScaleX, internal.initialScaleY);
+                               var newScale = Math.max(root.minScale, Math.min(root.maxScale, initialScale + scaleDelta));
 
-                               newScale = root.snapScaleToGrid(newScale);
+                               newScale = root.snapScaleXToGrid(newScale);
 
                                if (!isNaN(newScale) && newScale > 0) {
+                                 root.widgetScaleX = newScale;
+                                 root.widgetScaleY = newScale;
                                  root.widgetScale = newScale;
                                  internal.lastScale = newScale;
+                                 internal.lastScaleX = newScale;
+                                 internal.lastScaleY = newScale;
                                }
                              }
                            }
@@ -614,12 +704,20 @@ Item {
         onReleased: mouse => {
                       if (internal.isScaling && internal.operationType === "scale") {
                         root.updateWidgetData({
-                                                "scale": root.widgetScale
+                                                "scale": root.widgetScale,
+                                                "scaleX": root.widgetScaleX,
+                                                "scaleY": root.widgetScaleY
                                               });
                         internal.isScaling = false;
                         internal.operationType = "";
-                        root.widgetScale = root.snapScaleToGrid(root.widgetScale);
+                        var snappedX = root.snapScaleXToGrid(root.widgetScaleX);
+                        var snappedY = root.snapScaleYToGrid(root.widgetScaleY);
+                        root.widgetScaleX = snappedX;
+                        root.widgetScaleY = snappedY;
+                        root.widgetScale = (snappedX + snappedY) / 2;
                         internal.lastScale = root.widgetScale;
+                        internal.lastScaleX = snappedX;
+                        internal.lastScaleY = snappedY;
                       }
                     }
 
@@ -627,6 +725,103 @@ Item {
           internal.isScaling = false;
           internal.operationType = "";
           internal.lastScale = root.widgetScale;
+          internal.lastScaleX = root.widgetScaleX;
+          internal.lastScaleY = root.widgetScaleY;
+        }
+      }
+    }
+  }
+
+  // Side handles for scaling horizontally and vertically separately
+  Repeater {
+    model: 4 // Four sides
+
+    delegate: Rectangle {
+      id: sideHandle
+      visible: DesktopWidgetRegistry.editMode && !internal.isDragging
+      
+      // Determine values based on index
+      // 0: Left, 1: Right, 2: Top, 3: Bottom
+      readonly property int side: index
+      
+      x: {
+        if (side === 0) return -outlineMargin;
+        if (side === 1) return root.width + outlineMargin - cornerHandleSize;
+        return outlineMargin;
+      }
+      
+      y: {
+        if (side === 2) return -outlineMargin;
+        if (side === 3) return root.height + outlineMargin - cornerHandleSize;
+        return outlineMargin;
+      }
+      
+      width: (side === 0 || side === 1) ? cornerHandleSize : (root.width - outlineMargin * 2)
+      height: (side === 2 || side === 3) ? cornerHandleSize : (root.height - outlineMargin * 2)
+      
+      color: "transparent"
+      z: 1999
+
+      MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton
+        cursorShape: (sideHandle.side === 0 || sideHandle.side === 1) ? Qt.SizeHorCursor : Qt.SizeVerCursor
+        property point pressPos: Qt.point(0, 0)
+
+        onPressed: mouse => {
+                     if (internal.operationType !== "") {
+                       return;
+                     }
+                     pressPos = mapToItem(root.parent, mouse.x, mouse.y);
+                     internal.operationType = "scale";
+                     internal.isScaling = true;
+                     internal.initialScaleX = root.widgetScaleX;
+                     internal.initialScaleY = root.widgetScaleY;
+                     internal.initialWidth = root.width;
+                     internal.initialHeight = root.height;
+                   }
+
+        onPositionChanged: mouse => {
+                             if (internal.isScaling && pressed && internal.operationType === "scale") {
+                               var currentPos = mapToItem(root.parent, mouse.x, mouse.y);
+                               var deltaX = currentPos.x - pressPos.x;
+                               var deltaY = currentPos.y - pressPos.y;
+
+                               var sensitivity = 150;
+                               if (sideHandle.side === 0 || sideHandle.side === 1) {
+                                 var xDir = (sideHandle.side === 0) ? -1 : 1;
+                                 var scaleDeltaX = (deltaX * xDir) / sensitivity;
+                                 var newScaleX = Math.max(root.minScale, Math.min(root.maxScale, internal.initialScaleX + scaleDeltaX));
+                                 newScaleX = root.snapScaleXToGrid(newScaleX);
+                                 if (!isNaN(newScaleX) && newScaleX > 0) {
+                                   root.widgetScaleX = newScaleX;
+                                 }
+                               } else {
+                                 var yDir = (sideHandle.side === 2) ? -1 : 1;
+                                 var scaleDeltaY = (deltaY * yDir) / sensitivity;
+                                 var newScaleY = Math.max(root.minScale, Math.min(root.maxScale, internal.initialScaleY + scaleDeltaY));
+                                 newScaleY = root.snapScaleYToGrid(newScaleY);
+                                 if (!isNaN(newScaleY) && newScaleY > 0) {
+                                   root.widgetScaleY = newScaleY;
+                                 }
+                               }
+                             }
+                           }
+
+        onReleased: mouse => {
+                      if (internal.isScaling && internal.operationType === "scale") {
+                        root.updateWidgetData({
+                                                "scaleX": root.widgetScaleX,
+                                                "scaleY": root.widgetScaleY
+                                              });
+                        internal.isScaling = false;
+                        internal.operationType = "";
+                      }
+                    }
+
+        onCanceled: {
+          internal.isScaling = false;
+          internal.operationType = "";
         }
       }
     }

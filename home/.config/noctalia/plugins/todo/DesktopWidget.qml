@@ -19,20 +19,20 @@ DraggableDesktopWidget {
   readonly property color itemBg: showBackground ? Color.mSurface : "transparent"
   readonly property color completedItemBg: showBackground ? Color.mSurfaceVariant : "transparent"
   // Scaled dimensions
-  readonly property int scaledMarginM: Math.round(Style.marginM * widgetScale)
-  readonly property int scaledMarginS: Math.round(Style.marginS * widgetScale)
-  readonly property int scaledMarginL: Math.round(Style.marginL * widgetScale)
-  readonly property int scaledBaseWidgetSize: Math.round(Style.baseWidgetSize * widgetScale)
-  readonly property int scaledFontSizeL: Math.round(Style.fontSizeL * widgetScale)
-  readonly property int scaledFontSizeM: Math.round(Style.fontSizeM * widgetScale)
-  readonly property int scaledFontSizeS: Math.round(Style.fontSizeS * widgetScale)
-  readonly property int scaledRadiusM: Math.round(Style.radiusM * widgetScale)
-  readonly property int scaledRadiusS: Math.round(Style.radiusS * widgetScale)
+  readonly property int scaledMarginM: Math.round(Style.marginM * widgetScaleY)
+  readonly property int scaledMarginS: Math.round(Style.marginS * widgetScaleY)
+  readonly property int scaledMarginL: Math.round(Style.marginL * widgetScaleY)
+  readonly property int scaledBaseWidgetSize: Math.round(Style.baseWidgetSize * widgetScaleY)
+  readonly property int scaledFontSizeL: Math.round(Style.fontSizeL * widgetScaleY)
+  readonly property int scaledFontSizeM: Math.round(Style.fontSizeM * widgetScaleY)
+  readonly property int scaledFontSizeS: Math.round(Style.fontSizeS * widgetScaleY)
+  readonly property int scaledRadiusM: Math.round(Style.radiusM * widgetScaleY)
+  readonly property int scaledRadiusS: Math.round(Style.radiusS * widgetScaleY)
 
   // Reference to Main.qml instance for centralized data management
   readonly property var mainInstance: pluginApi?.mainInstance
 
-  implicitWidth: Math.round(300 * widgetScale)
+  implicitWidth: Math.round(300 * widgetScaleX)
   implicitHeight: {
     var headerHeight = scaledBaseWidgetSize + scaledMarginL * 2;
     if (!expanded)
@@ -41,10 +41,10 @@ DraggableDesktopWidget {
     // Add the height of the tab bar when expanded
     var tabBarHeight = scaledBaseWidgetSize * 0.8;
     var todosCount = root.filteredTodosModel.count;
-    var contentHeight = (todosCount === 0) ? scaledBaseWidgetSize : (scaledBaseWidgetSize * todosCount + scaledMarginS * (todosCount - 1));
+    var contentHeight = (typeof columnLayout !== "undefined" && columnLayout && columnLayout.implicitHeight > 0) ? columnLayout.implicitHeight : ((todosCount === 0) ? scaledBaseWidgetSize : (scaledBaseWidgetSize * todosCount + scaledMarginS * (todosCount - 1)));
     var totalHeight = contentHeight + headerHeight + tabBarHeight + scaledMarginS + scaledMarginM * 4;
 
-    return Math.min(totalHeight, headerHeight + tabBarHeight + Math.round(400 * widgetScale));
+    return Math.min(totalHeight, headerHeight + tabBarHeight + Math.round(400 * widgetScaleY));
   }
 
   // Define a function to schedule reloading of todos
@@ -269,96 +269,182 @@ DraggableDesktopWidget {
               model: root.filteredTodosModel
 
               delegate: Item {
+                id: delegateRoot
                 width: parent.width
-                height: scaledBaseWidgetSize
+
+                // Track details expanded state
+                property bool detailsExpanded: false
+
+                // Check if the item actually has details
+                readonly property bool hasDetails: model.details !== undefined && model.details !== null && model.details.trim().length > 0
+
+                // Height of the delegate:
+                // If details are expanded and details exist, it is the top row height (scaledBaseWidgetSize) + details height.
+                // Otherwise it is just the top row height.
+                height: (detailsExpanded && hasDetails)
+                  ? (scaledBaseWidgetSize + detailsArea.implicitHeight)
+                  : scaledBaseWidgetSize
+
+                Behavior on height {
+                  NumberAnimation {
+                    duration: 150
+                    easing.type: Easing.InOutQuad
+                  }
+                }
 
                 Rectangle {
                   anchors.fill: parent
                   anchors.margins: 0
                   color: model.completed ? root.completedItemBg : root.itemBg
                   radius: Style.iRadiusS * widgetScale
+                  clip: true // Prevents details text from showing outside during slide animation
 
-                  Item {
+                  Column {
                     anchors.fill: parent
-                    anchors.margins: scaledMarginM
+                    spacing: 0
 
-                    // Custom checkbox implementation with TapHandler
+                    // Main row containing checkbox, priority line, text and chevron
                     Item {
-                      id: customCheckboxContainer
-                      width: scaledBaseWidgetSize * 0.7
-                      height: scaledBaseWidgetSize * 0.7
-                      anchors.left: priorityIndicator.right
-                      anchors.verticalCenter: parent.verticalCenter
+                      width: parent.width
+                      height: scaledBaseWidgetSize
 
-                      Rectangle {
-                        id: customCheckbox
-                        width: scaledBaseWidgetSize * 0.5
-                        height: scaledBaseWidgetSize * 0.5
-                        radius: Style.iRadiusXXS
-                        color: Color.mSurface
-                        opacity: showBackground ? 1.0 : 0.5
-                        border.color: Color.mOutline
-                        border.width: Style.borderS
-                        anchors.centerIn: parent
+                      // Custom checkbox implementation
+                      Item {
+                        id: customCheckboxContainer
+                        width: scaledBaseWidgetSize * 0.7
+                        height: scaledBaseWidgetSize * 0.7
+                        anchors.left: priorityIndicator.right
+                        anchors.verticalCenter: parent.verticalCenter
 
-                        NIcon {
-                          visible: model.completed
+                        Rectangle {
+                          id: customCheckbox
+                          width: scaledBaseWidgetSize * 0.5
+                          height: scaledBaseWidgetSize * 0.5
+                          radius: Style.iRadiusXXS
+                          color: Color.mSurface
+                          opacity: showBackground ? 1.0 : 0.5
+                          border.color: Color.mOutline
+                          border.width: Style.borderS
                           anchors.centerIn: parent
-                          anchors.horizontalCenterOffset: 0
-                          icon: "check"
-                          color: Color.mPrimary
-                          pointSize: Math.max(Style.fontSizeXS, width * 0.5)
+
+                          NIcon {
+                            visible: model.completed
+                            anchors.centerIn: parent
+                            anchors.horizontalCenterOffset: 0
+                            icon: "check"
+                            color: Color.mPrimary
+                            pointSize: Math.max(Style.fontSizeXS, width * 0.5)
+                          }
+
+                          MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: false
+
+                            onClicked: {
+                              toggleTodo(model.id, model.completed);
+                            }
+                          }
                         }
+                      }
+
+                      // Priority indicator - a colored vertical line
+                      Rectangle {
+                        id: priorityIndicator
+                        width: 3
+                        height: parent.height - scaledMarginS
+                        anchors.left: parent.left
+                        anchors.leftMargin: scaledMarginM
+                        anchors.verticalCenter: parent.verticalCenter
+                        radius: 1.5
+
+                        // Determine color based on priority using helper function
+                        color: {
+                          if (pluginApi) {
+                            return getPriorityColor(model.priority || "medium");
+                          } else {
+                            var priority = model.priority || "medium";
+                            if (priority === "high") {
+                              return Color.mError;
+                            } else if (priority === "low") {
+                              return Color.mOnSurfaceVariant;
+                            } else {
+                              return Color.mPrimary;
+                            }
+                          }
+                        }
+                      }
+
+                      // Dropdown chevron button to toggle details
+                      NIcon {
+                        id: expandButton
+                        anchors.right: parent.right
+                        anchors.rightMargin: scaledMarginM
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: delegateRoot.hasDetails
+                        icon: delegateRoot.detailsExpanded ? "chevron-up" : "chevron-down"
+                        pointSize: scaledFontSizeS
+                        color: Color.mOnSurfaceVariant
+                        opacity: 0.6
 
                         MouseArea {
                           anchors.fill: parent
-                          hoverEnabled: false
-
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onEntered: expandButton.opacity = 1.0
+                          onExited: expandButton.opacity = 0.6
                           onClicked: {
-                            toggleTodo(model.id, model.completed);
+                            delegateRoot.detailsExpanded = !delegateRoot.detailsExpanded;
                           }
                         }
                       }
-                    }
 
-                    // Priority indicator - a colored vertical line
-                    Rectangle {
-                      id: priorityIndicator
-                      width: 3
-                      height: parent.height - scaledMarginS
-                      anchors.left: parent.left
-                      anchors.leftMargin: scaledMarginM
-                      anchors.verticalCenter: parent.verticalCenter
-                      radius: 1.5
-
-                      // Determine color based on priority using helper function
-                      color: {
-                        if (pluginApi) {
-                          return getPriorityColor(model.priority || "medium");
-                        } else {
-                          var priority = model.priority || "medium";
-                          if (priority === "high") {
-                            return Color.mError;
-                          } else if (priority === "low") {
-                            return Color.mOnSurfaceVariant;
-                          } else {
-                            return Color.mPrimary;
-                          }
-                        }
+                      // Task text
+                      NText {
+                        text: model.text
+                        color: model.completed ? Color.mOnSurfaceVariant : Color.mOnSurface
+                        font.strikeout: model.completed
+                        elide: Text.ElideRight
+                        anchors.left: customCheckboxContainer.right
+                        anchors.leftMargin: scaledMarginS
+                        anchors.right: delegateRoot.hasDetails ? expandButton.left : parent.right
+                        anchors.rightMargin: scaledMarginM
+                        anchors.verticalCenter: parent.verticalCenter
+                        font.pointSize: scaledFontSizeS
                       }
                     }
 
-                    NText {
-                      text: model.text
-                      color: model.completed ? Color.mOnSurfaceVariant : Color.mOnSurface
-                      font.strikeout: model.completed
-                      elide: Text.ElideRight
-                      anchors.left: customCheckboxContainer.right
-                      anchors.leftMargin: scaledMarginS
-                      anchors.right: parent.right
-                      anchors.rightMargin: scaledMarginM
-                      anchors.verticalCenter: parent.verticalCenter
-                      font.pointSize: scaledFontSizeS
+                    // Details section showing task details
+                    Item {
+                      id: detailsArea
+                      width: parent.width
+                      implicitHeight: detailsText.implicitHeight + scaledMarginM * 2
+                      visible: delegateRoot.detailsExpanded && delegateRoot.hasDetails
+
+                      // A subtle separator line
+                      Rectangle {
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.leftMargin: scaledMarginM + 3 + scaledBaseWidgetSize * 0.7
+                        anchors.rightMargin: scaledMarginM
+                        height: 1
+                        color: Color.mOutline
+                        opacity: 0.15
+                      }
+
+                      NText {
+                        id: detailsText
+                        text: model.details || ""
+                        color: Color.mOnSurfaceVariant
+                        font.pointSize: Math.round(Style.fontSizeXS * widgetScale)
+                        wrapMode: Text.Wrap
+                        anchors.left: parent.left
+                        anchors.leftMargin: scaledMarginM + 3 + scaledBaseWidgetSize * 0.7
+                        anchors.right: parent.right
+                        anchors.rightMargin: scaledMarginM
+                        anchors.top: parent.top
+                        anchors.topMargin: scaledMarginM
+                      }
                     }
                   }
                 }
