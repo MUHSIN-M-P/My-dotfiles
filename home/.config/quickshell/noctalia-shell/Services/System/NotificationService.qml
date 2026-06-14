@@ -126,6 +126,86 @@ Singleton {
     }
   }
 
+  Connections {
+    target: ToastService
+    function onNotify(title, description, icon, type, duration, actionLabel, actionCallback) {
+      root.notifyToast(title, description, icon, type, duration, actionLabel, actionCallback);
+    }
+  }
+
+  function notifyToast(title, description, icon, type, duration, actionLabel, actionCallback) {
+    const time = new Date();
+    const id = Checksum.sha256(JSON.stringify({
+                                                "summary": title || "",
+                                                "body": description || "",
+                                                "app": "System",
+                                                "time": time.getTime()
+                                              }));
+
+    let image = icon || "";
+    if (image && !image.startsWith("/") && !image.startsWith("file://")) {
+      if (ThemeIcons.iconExists(image)) {
+        image = ThemeIcons.iconFromName(image);
+      }
+    }
+
+    const urgency = (type === "error") ? 2 : (type === "warning") ? 1 : 1;
+    const durVal = duration || 3000;
+
+    var actions = [];
+    if (actionLabel && actionCallback) {
+      actions.push({
+                     "text": actionLabel,
+                     "identifier": "toast_action"
+                   });
+    }
+
+    const data = {
+      "id": id,
+      "summary": processNotificationText(title || ""),
+      "summaryMarkdown": processNotificationMarkdown(title || ""),
+      "body": processNotificationText(description || ""),
+      "bodyMarkdown": processNotificationMarkdown(description || ""),
+      "appName": "System",
+      "urgency": urgency,
+      "expireTimeout": durVal,
+      "timestamp": time,
+      "progress": 1.0,
+      "originalImage": image,
+      "cachedImage": image,
+      "originalId": 0,
+      "actionsJson": JSON.stringify(actions)
+    };
+
+    popupState[id] = {
+      "notification": null,
+      "watcher": null,
+      "cachedActions": actions,
+      "onClosed": null,
+      "actionCallback": actionCallback,
+      "metadata": {
+        "originalId": 0,
+        "timestamp": time.getTime(),
+        "duration": durVal,
+        "urgency": urgency,
+        "paused": false,
+        "pauseTime": 0
+      }
+    };
+
+    Qt.callLater(() => {
+                   popupModel.insert(0, data);
+
+                   while (popupModel.count > maxPopups) {
+                     const last = popupModel.get(popupModel.count - 1);
+                     popupModel.remove(popupModel.count - 1);
+                     cleanupNotification(last.id);
+                   }
+                 });
+
+    playNotificationSound(urgency, "System");
+  }
+
   // Helper function to generate content-based ID for deduplication
   function getContentId(summary, body, appName) {
     return Checksum.sha256(JSON.stringify({
@@ -952,7 +1032,14 @@ Singleton {
     let invoked = false;
     const notifData = popupState[id];
 
-    if (notifData && notifData.notification) {
+    if (notifData && notifData.actionCallback && actionId === "toast_action") {
+      try {
+        notifData.actionCallback();
+        invoked = true;
+      } catch (e) {
+        Logger.e("NotificationService", "Failed to invoke toast callback: " + e);
+      }
+    } else if (notifData && notifData.notification) {
       const actionsToUse = (notifData.notification.actions && notifData.notification.actions.length > 0) ? notifData.notification.actions : (notifData.cachedActions || []);
 
       if (actionsToUse && actionsToUse.length > 0) {

@@ -45,7 +45,7 @@ PKGS=(
   # core compositor & shell
   hyprland noctalia-qs quickshell
   # terminal & shell tools
-  kitty fastfetch atuin bash-completion git
+  kitty fastfetch atuin bash-completion git stow
   # wallpaper / video
   mpvpaper ffmpeg ImageMagick
   # screenshot / screen tools
@@ -118,6 +118,13 @@ if [ -f "$HERE/system/etc/systemd/system/tuned-bootfast-reset.service" ]; then
   sudo systemctl enable tuned-bootfast-reset.service
 fi
 
+# Custom libfprint restoration service for fingerprint sensor
+if [ -f "$HERE/system/etc/systemd/system/libfprint-custom.service" ]; then
+  sudo install -m 0644 "$HERE/system/etc/systemd/system/libfprint-custom.service" /etc/systemd/system/libfprint-custom.service
+  sudo systemctl daemon-reload
+  sudo systemctl enable libfprint-custom.service
+fi
+
 # Systemd background services override files for perceived responsiveness
 for s in dnf-makecache fstrim packagekit plocate-updatedb; do
   sudo mkdir -p /etc/systemd/system/"$s".service.d
@@ -126,6 +133,22 @@ done
 
 # Optimize boot time by masking NetworkManager-wait-online.service
 sudo systemctl mask NetworkManager-wait-online.service
+
+# Enable fingerprint authentication in authselect
+if command -v authselect >/dev/null; then
+  sudo authselect select local with-fingerprint --force || warn "Could not enable with-fingerprint in authselect"
+fi
+
+# PAM configurations for dual-auth (fingerprint + password)
+sudo mkdir -p /etc/pam.d
+for f in sudo sddm polkit-1; do
+  if [ -f "$HERE/system/etc/pam.d/$f" ]; then
+    if [ -f "/etc/pam.d/$f" ] && ! cmp -s "$HERE/system/etc/pam.d/$f" "/etc/pam.d/$f"; then
+      sudo cp -a "/etc/pam.d/$f" "/etc/pam.d/$f.preinst.bak"
+    fi
+    sudo install -m 0644 "$HERE/system/etc/pam.d/$f" "/etc/pam.d/$f"
+  fi
+done
 
 # SDDM Theme Installation
 if [ -d "$HERE/system/usr/share/sddm/themes/noctalia" ]; then

@@ -1,0 +1,12 @@
+[Unit]
+Description=Restore custom elanmoc2 patched libfprint symlink
+After=local-fs.target
+Before=fprintd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c "ln -sf libfprint-2.so.2.0.0 /usr/lib64/libfprint-2.so.2 && echo elanmoc2-custom libfprint active"
+
+[Install]
+WantedBy=multi-user.target

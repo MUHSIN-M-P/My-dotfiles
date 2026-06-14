@@ -438,7 +438,9 @@
                             "useCustomColors": false
                         },
                         "id": "plugin:todo",
-                        "scale": 1,
+                        "scale": 1.2800000000000002,
+                        "scaleX": 1.5200000000000002,
+                        "scaleY": 1.775038520801233,
                         "showBackground": true,
                         "x": 24,
                         "y": 96

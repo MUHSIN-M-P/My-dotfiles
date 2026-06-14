@@ -32,11 +32,13 @@ esac
 # Apply the new profile
 gdbus call --system --dest org.freedesktop.UPower.PowerProfiles --object-path /org/freedesktop/UPower/PowerProfiles --method org.freedesktop.DBus.Properties.Set org.freedesktop.UPower.PowerProfiles ActiveProfile "<'$new_profile'>" >/dev/null
 
-# Send premium transient notification (replaces existing fan-profile notifications in-place)
-notify-send \
-    -h string:x-canonical-private-synchronous:fan-profile \
-    -a "System" \
-    -i "$icon" \
-    -t 2000 \
-    "Fan Profile: $display_name" \
-    "$msg"
+# notify-send is commented out to prevent duplicate notifications.
+# Noctalia's native ToastService automatically listens to UPower profile changes and alerts the user.
+# notify-send \
+#     -h string:x-canonical-private-synchronous:fan-profile \
+#     -a "System" \
+#     -i "$icon" \
+#     -t 2000 \
+#     "Fan Profile: $display_name" \
+#     "$msg"
+

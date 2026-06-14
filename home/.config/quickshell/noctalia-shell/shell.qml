@@ -133,7 +133,7 @@ ShellRoot {
       AllScreens {}
       Dock {}
       Notification {}
-      ToastOverlay {}
+      // ToastOverlay {} // Disabled to route toasts to standard notifications for stacking
       OSD {}
 
       // Launcher overlay window (for overlay layer mode)

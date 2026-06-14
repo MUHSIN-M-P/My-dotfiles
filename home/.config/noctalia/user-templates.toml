@@ -1,0 +1,42 @@
+[config]
+
+[templates]
+
+# User-defined templates
+# Add your custom templates below
+# Example:
+# [templates.myapp]
+# input_path = "~/.config/noctalia/templates/myapp.css"
+# output_path = "~/.config/myapp/theme.css"
+# post_hook = "myapp --reload-theme"
+
+# Remove this section and add your own templates
+#[templates.placeholder]
+#input_path = "/home/elrond/.config/quickshell/noctalia-shell/Assets/MatugenTemplates/noctalia.json"
+#output_path = "/home/elrond/.cache/noctalia/placeholder.json"
+
+
+# since I use end4's GTK 4 template, I have to disable GTK from noctalia. So I have to declare their GTK 3 template.
+[templates.gtk3]
+input_path = "~/.config/noctalia/matugenTemplates/gtk3.css"
+output_path = '~/.config/gtk-3.0/gtk.css'
+
+[templates.gtk4]
+input_path = "~/.config/noctalia/matugenTemplates/gtk4.css"
+output_path = '~/.config/gtk-4.0/gtk.css'
+
+[templates.hyprland]
+input_path = "~/.config/noctalia/matugenTemplates/hyprland.conf"
+output_path = "~/.config/hypr/noctalia/noctalia-overrides.conf"
+
+[templates.discordCustomVesktop]
+input_path = "~/.config/noctalia/matugenTemplates/discord-midnight.css"
+output_path = "~/.config/vesktop/themes/discord-midnight-alt.css"
+
+[templates.discordCustomFlatpakVencord]
+input_path = "~/.config/noctalia/matugenTemplates/discord-midnight.css"
+output_path = "~/.var/app/com.discordapp.Discord/config/Vencord/themes/noctalia-midnight-alt.css"
+
+[templates.overview]
+input_path = "~/.config/noctalia/matugenTemplates/quickshell-overview.qml"
+output_path = "~/.config/quickshell/overview/common/Appearance.colors.qml"

@@ -1,0 +1,26 @@
+#%PAM-1.0
+# SDDM PAM - Fingerprint + Password + Keyring
+# Usage: press Enter with EMPTY field → triggers fingerprint scan
+#        type password + Enter → authenticates with password directly
+
+auth     [success=done ignore=ignore default=bad] pam_selinux_permit.so
+auth     [success=2 default=ignore]               pam_unix.so try_first_pass nullok
+auth     sufficient                               pam_fprintd.so max-tries=3 timeout=30
+auth     substack                                 password-auth
+auth     optional                                 pam_gnome_keyring.so
+auth     include                                  postlogin
+
+account     required      pam_nologin.so
+account     include       password-auth
+
+password    include       password-auth
+
+session     required      pam_selinux.so close
+session     required      pam_loginuid.so
+-session    optional      pam_ck_connector.so
+session     required      pam_selinux.so open
+session     optional      pam_keyinit.so force revoke
+session     required      pam_namespace.so
+session     include       password-auth
+session     optional      pam_gnome_keyring.so auto_start
+session     include       postlogin
