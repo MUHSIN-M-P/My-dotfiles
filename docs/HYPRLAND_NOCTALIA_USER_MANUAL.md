@@ -45,6 +45,7 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 37. [Wayland Clipboard Persistence Service (wl-clip-persist)](#37-wayland-clipboard-persistence-service-wl-clip-persist)
 38. [Dedicated GPU Launcher Wrapper (nvrun)](#38-dedicated-gpu-launcher-wrapper-nvrun)
 39. [Elan Match-on-Chip Fingerprint Setup](#39-elan-match-on-chip-fingerprint-setup)
+40. [Hyprland 120Hz Rendering & Animation Performance Tuning](#40-hyprland-120hz-rendering--animation-performance-tuning)
 
 ---
 
@@ -1486,3 +1487,38 @@ To restart the fingerprint daemon:
 ```bash
 sudo systemctl restart fprintd.service
 ```
+
+---
+
+## 40. Hyprland 120Hz Rendering & Animation Performance Tuning
+
+To optimize your hybrid graphics configuration (Intel integrated + NVIDIA RTX 4050 dGPU) and harness your 120Hz display's potential, several critical optimizations have been integrated.
+
+### 40.1 Graphics Offloading & Display Allocation
+Your laptop's primary display (`eDP-1`) is physically connected to the **Intel integrated GPU (`card1`)**. 
+To optimize power usage, thermal performance, and eliminate display-offloading stutters, both wlroots and Aquamarine rendering devices are prioritized in `~/.config/hypr/configs/user-overrides.conf`:
+```ini
+env = WLR_DRM_DEVICES,/dev/dri/card1:/dev/dri/card0
+env = AQ_DRM_DEVICES,/dev/dri/card1:/dev/dri/card0
+```
+This ensures the compositor runs its daily operations on the Intel iGPU, using the NVIDIA card only for demand-heavy applications wrapped via the `nvrun` launcher.
+
+### 40.2 120Hz Premium Animation Set
+We customized the rendering curves to create a modern, buttery-smooth environment matching the high refresh rate:
+*   **`fluent_decel` Bezier (`0.1, 1, 0, 1`):** A curve that starts instantly and slowly decelerates, applied to window movement, exiting, and layer fades.
+*   **`premium_spring` Bezier (`0.15, 1.15, 0.25, 1.00`):** A custom spring with a minor overshoot bounce that gives windows a tactile "pop" on spawning.
+*   **Workspace Synchronization:** Workspace transitions use `fluent_decel` over `4.2` ticks with `slidefadevert 20%` (vertical slide with fade) to coordinate with your **3-finger vertical touchpad gesture**.
+
+### 40.3 Compositor Window Features & Syncing
+*   **Manual Resize/Drag Animations:** Window scaling and dragging are animated smoothly to prevent visual stutter:
+    ```ini
+    misc {
+        animate_manual_resizes = true
+        animate_mouse_windowdragging = true
+    }
+    ```
+*   **Explicit Sync:** Obsolete rendering configurations (`render:explicit_sync`) have been omitted because **Explicit Sync** is now always enabled by default under Hyprland 0.50+ and Aquamarine.
+*   **Configuration Validation:** If you change options, reload using `hyprctl reload` and check for syntax issues using:
+    ```bash
+    hyprctl configerrors
+    ```
