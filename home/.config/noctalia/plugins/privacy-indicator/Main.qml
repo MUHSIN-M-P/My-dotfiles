@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Services.Pipewire
 import qs.Commons
 import qs.Services.UI
@@ -37,35 +36,8 @@ Item {
     objects: Pipewire.ready ? Pipewire.nodes.values : []
   }
 
-  Process {
-    id: cameraDetectionProcess
-    running: false
-    command: ["sh", "-c", "for dev in /sys/class/video4linux/video*; do [ -e \"$dev/name\" ] && grep -qv 'Metadata' \"$dev/name\" && dev_name=$(basename \"$dev\") && find /proc/[0-9]*/fd -lname \"/dev/$dev_name\" 2>/dev/null; done | cut -d/ -f3 | xargs -r ps -o comm= -p | sort -u | tr '\\n' ',' | sed 's/,$//'"]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        var appsString = this.text.trim();
-        var apps = appsString.length > 0 ? appsString.split(',') : [];
-
-        var filterRegex = null;
-        if (root.camFilterRegex && root.camFilterRegex.length > 0) {
-          try {
-            filterRegex = new RegExp(root.camFilterRegex);
-          } catch (e) {
-            Logger.w("PrivacyIndicator: Invalid camFilterRegex:", root.camFilterRegex);
-          }
-        }
-
-        var appNames = [];
-        for (var i = 0; i < apps.length; i++) {
-            var appName = apps[i];
-            if (filterRegex && appName && filterRegex.test(appName)) continue;
-            if (appName && appNames.indexOf(appName) === -1) appNames.push(appName);
-        }
-
-        root.camApps = appNames;
-        root.camActive = appNames.length > 0;
-      }
-    }
+  PwObjectTracker {
+    objects: Pipewire.ready ? Pipewire.links.values : []
   }
 
 
@@ -121,8 +93,57 @@ Item {
     root.micApps = appNames;
   }
 
-  function updateCameraState() {
-    cameraDetectionProcess.running = true;
+  // Returns true if a PipeWire node is a real camera source (not a v4l2loopback screen share)
+  function isCameraSourceNode(node) {
+    if (!node || !node.properties) return false;
+    var mediaClass = node.properties["media.class"] || "";
+    if (mediaClass !== "Video/Source") return false;
+    // media.role = "Camera" distinguishes real cameras from v4l2loopback screen-share sources
+    var mediaRole = node.properties["media.role"] || "";
+    if (mediaRole === "Camera") return true;
+    // Fallback: v4l2 uvcvideo driver is a camera; also accept if no role but device.api is v4l2
+    // and media.name doesn't look like a screen share source
+    var driver = node.properties["api.v4l2.cap.driver"] || "";
+    if (driver === "uvcvideo") return true;
+    return false;
+  }
+
+  function updateCameraState(nodes, links) {
+    var appNames = [];
+    var isActive = false;
+
+    var filterRegex = null;
+    if (root.camFilterRegex && root.camFilterRegex.length > 0) {
+      try {
+        filterRegex = new RegExp(root.camFilterRegex);
+      } catch (e) {
+        Logger.w("PrivacyIndicator: Invalid camFilterRegex:", root.camFilterRegex);
+      }
+    }
+
+    // Find camera source nodes that have active links (i.e., something is consuming the camera)
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (!isCameraSourceNode(node)) continue;
+      if (!hasNodeLinks(node, links)) continue;
+
+      // Find the consumer (destination / "target") nodes linked from this camera source
+      for (var j = 0; j < links.length; j++) {
+        var link = links[j];
+        if (!link) continue;
+        // In Quickshell PipeWire: link.source is the output node, link.target is the input node
+        if (link.source !== node) continue;
+        var consumer = link.target;
+        if (!consumer || !consumer.properties) continue;
+        var appName = getAppName(consumer);
+        if (filterRegex && appName && filterRegex.test(appName)) continue;
+        isActive = true;
+        if (appName && appNames.indexOf(appName) === -1) appNames.push(appName);
+      }
+    }
+
+    root.camApps = appNames;
+    root.camActive = isActive;
   }
 
   function isScreenShareNode(node) {
@@ -160,7 +181,7 @@ Item {
     var nodes = Pipewire.nodes.values || [];
     var links = Pipewire.links.values || [];
     updateMicrophoneState(nodes, links);
-    updateCameraState();
+    updateCameraState(nodes, links);
     updateScreenShareState(nodes, links);
   }
 

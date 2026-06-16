@@ -1,0 +1,14 @@
+[
+  {
+    "keys": "Super + Alt + T",
+    "desc": "Custom Terminal Split",
+    "explanation": "Launches a new terminal instance and automatically positions it in a split layout.",
+    "command": "exec kitty --class custom-split"
+  },
+  {
+    "keys": "Super + Alt + B",
+    "desc": "Toggle Bluetooth Power",
+    "explanation": "Executes rfkill to toggle power to the bluetooth controller.",
+    "command": "exec rfkill toggle bluetooth"
+  }
+]

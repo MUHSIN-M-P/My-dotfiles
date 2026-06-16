@@ -1,9 +1,9 @@
 #%PAM-1.0
-# Fingerprint: scan finger to authenticate instantly
-# Password: press Enter after typing password (fprintd times out in ~1s, then unix checks)
-# Quick bypass: press Enter with empty field → 1s wait → password prompt
+# Fingerprint: scan finger to authenticate (10s timeout)
+# Password: type password (fprintd times out in 10s, then unix checks)
+# Quick bypass: tap sensor with wrong finger to immediately fall back to password prompt
 auth       required     pam_env.so
-auth       sufficient   pam_fprintd.so max-tries=1 timeout=1
+auth       sufficient   pam_fprintd.so max-tries=1 timeout=10
 auth       sufficient   pam_unix.so nullok try_first_pass
 auth       required     pam_deny.so
 

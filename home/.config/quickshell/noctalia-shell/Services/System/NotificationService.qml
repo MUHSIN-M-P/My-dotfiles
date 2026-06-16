@@ -19,7 +19,7 @@ Singleton {
 
   // Configuration
   property int maxPopups: 5
-  property int maxHistory: 100
+  property int maxHistory: 10
   property string historyFile: Quickshell.env("NOCTALIA_NOTIF_HISTORY_FILE") || (Settings.cacheDir + "notifications.json")
 
   // State
@@ -739,7 +739,10 @@ Singleton {
   function loadHistory() {
     try {
       historyModel.clear();
-      for (const item of adapter.notifications || []) {
+      const notifications = adapter.notifications || [];
+      const count = Math.min(notifications.length, maxHistory);
+      for (var i = 0; i < count; i++) {
+        const item = notifications[i];
         const time = new Date(item.timestamp);
 
         // Use the cached image if it exists and starts with file://, otherwise use originalImage
