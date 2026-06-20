@@ -365,6 +365,8 @@ Singleton {
     popupModel.setProperty(index, "originalImage", data.originalImage);
     popupModel.setProperty(index, "cachedImage", data.cachedImage);
     popupModel.setProperty(index, "actionsJson", data.actionsJson);
+    popupModel.setProperty(index, "appIcon", data.appIcon);
+    popupModel.setProperty(index, "hasLargeImage", data.hasLargeImage);
     popupModel.setProperty(index, "timestamp", oldTimestamp);
     popupModel.setProperty(index, "progress", oldProgress);
 
@@ -497,7 +499,12 @@ Singleton {
                                                 "time": time.getTime()
                                               }));
 
-    const image = n.image || getIcon(n.appIcon);
+    let image = n.image || getIcon(n.appIcon);
+    if (image && image.startsWith("image://icon//")) {
+      image = image.substring(13);
+    } else if (image && image.startsWith("image://icon/file://")) {
+      image = image.substring(13);
+    }
     const imageId = generateImageId(n, image);
     queueImage(image, n.appName || "", n.summary || "", id);
 
@@ -520,7 +527,9 @@ Singleton {
       "actionsJson": JSON.stringify((n.actions || []).map(a => ({
                                                                   "text": (a.text || "").trim() || "Action",
                                                                   "identifier": a.identifier || ""
-                                                                })))
+                                                                }))),
+      "appIcon": getIcon(n.appIcon) || "",
+      "hasLargeImage": n.image ? true : false
     };
   }
 
@@ -554,6 +563,8 @@ Singleton {
     popupModel.setProperty(index, "originalImage", data.originalImage);
     popupModel.setProperty(index, "cachedImage", data.cachedImage);
     popupModel.setProperty(index, "actionsJson", data.actionsJson);
+    popupModel.setProperty(index, "appIcon", data.appIcon);
+    popupModel.setProperty(index, "hasLargeImage", data.hasLargeImage);
 
     // Update metadata
     notifData.metadata.urgency = data.urgency;
@@ -763,7 +774,9 @@ Singleton {
                               "originalImage": item.originalImage || "",
                               "cachedImage": cachedImage,
                               "actionsJson": item.actionsJson || "[]",
-                              "originalId": item.originalId || 0
+                              "originalId": item.originalId || 0,
+                              "appIcon": item.appIcon || "",
+                              "hasLargeImage": item.hasLargeImage || false
                             });
       }
     } catch (e) {

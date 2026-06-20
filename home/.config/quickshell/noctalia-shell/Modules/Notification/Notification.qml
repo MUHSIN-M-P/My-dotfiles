@@ -617,15 +617,16 @@ Variants {
                   Layout.bottomMargin: Style.marginM
 
                   NImageRounded {
-                    Layout.preferredWidth: Math.round(40 * Style.uiScaleRatio)
-                    Layout.preferredHeight: Math.round(40 * Style.uiScaleRatio)
-                    Layout.alignment: Qt.AlignVCenter
-                    radius: Math.min(Style.radiusL, Layout.preferredWidth / 2)
-                    imagePath: model.originalImage || ""
+                    Layout.preferredWidth: Math.round(32 * Style.uiScaleRatio)
+                    Layout.preferredHeight: Math.round(32 * Style.uiScaleRatio)
+                    Layout.alignment: Qt.AlignTop
+                    Layout.topMargin: Math.round(4 * Style.uiScaleRatio)
+                    radius: Layout.preferredWidth / 2
+                    imagePath: model.hasLargeImage ? (model.appIcon || "") : (model.cachedImage || model.originalImage || "")
                     borderColor: "transparent"
                     borderWidth: 0
                     fallbackIcon: "bell"
-                    fallbackIconSize: 24
+                    fallbackIconSize: 18
                   }
 
                   ColumnLayout {
@@ -691,6 +692,21 @@ Variants {
                       visible: text.length > 0
                       Layout.fillWidth: true
                       Layout.rightMargin: Style.marginXL
+                    }
+
+                    // Large Image Preview (Enlarged)
+                    NImageRounded {
+                      visible: model.hasLargeImage && (model.cachedImage !== "" || model.originalImage !== "")
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: Math.round(180 * Style.uiScaleRatio)
+                      radius: Style.radiusM
+                      imagePath: model.cachedImage || model.originalImage || ""
+                      imageFillMode: Image.PreserveAspectFit
+                      borderColor: Qt.alpha(Color.mOutline, 0.2)
+                      borderWidth: 1
+                      fallbackIcon: ""
+                      Layout.topMargin: Style.marginS
+                      Layout.bottomMargin: Style.marginS
                     }
 
                     // Actions

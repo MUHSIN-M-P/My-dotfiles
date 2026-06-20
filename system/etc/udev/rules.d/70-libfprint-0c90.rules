@@ -1,0 +1,4 @@
+# Elantech ARM-M4 fingerprint sensor (04f3:0c90) — udev access rule & disable autosuspend
+ACTION=="add|change", SUBSYSTEM=="usb", \
+  ATTR{idVendor}=="04f3", ATTR{idProduct}=="0c90", \
+  TAG+="uaccess", TEST=="power/control", ATTR{power/control}:="on"

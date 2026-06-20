@@ -125,6 +125,15 @@ if [ -f "$HERE/system/etc/systemd/system/libfprint-custom.service" ]; then
   sudo systemctl enable libfprint-custom.service
 fi
 
+# Custom udev rule for ELAN fingerprint sensor to disable autosuspend
+if [ -f "$HERE/system/etc/udev/rules.d/70-libfprint-0c90.rules" ]; then
+  sudo mkdir -p /etc/udev/rules.d
+  sudo install -m 0644 "$HERE/system/etc/udev/rules.d/70-libfprint-0c90.rules" /etc/udev/rules.d/70-libfprint-0c90.rules
+  if command -v udevadm >/dev/null; then
+    sudo udevadm control --reload-rules && sudo udevadm trigger || true
+  fi
+fi
+
 # Systemd background services override files for perceived responsiveness
 for s in dnf-makecache fstrim packagekit plocate-updatedb; do
   sudo mkdir -p /etc/systemd/system/"$s".service.d
@@ -136,7 +145,24 @@ sudo systemctl mask NetworkManager-wait-online.service
 
 # Enable fingerprint authentication in authselect
 if command -v authselect >/dev/null; then
-  sudo authselect select local with-fingerprint --force || warn "Could not enable with-fingerprint in authselect"
+  # Create custom authselect profile if it doesn't exist
+  if [ ! -d /etc/authselect/custom/local-custom ]; then
+    sudo authselect create-profile local-custom -b local || warn "Could not create custom authselect profile"
+  fi
+  if [ -d /etc/authselect/custom/local-custom ]; then
+    # Customize the PAM templates in the custom profile (idempotently)
+    if ! grep -q "timeout=10" /etc/authselect/custom/local-custom/system-auth; then
+      sudo sed -i 's/pam_fprintd.so/pam_fprintd.so max-tries=1 timeout=10/g' /etc/authselect/custom/local-custom/system-auth
+    fi
+    if ! grep -q "timeout=10" /etc/authselect/custom/local-custom/fingerprint-auth; then
+      sudo sed -i 's/pam_fprintd.so/pam_fprintd.so max-tries=1 timeout=10/g' /etc/authselect/custom/local-custom/fingerprint-auth
+    fi
+    # Select the custom profile
+    sudo authselect select custom/local-custom with-fingerprint --force || warn "Could not select custom/local-custom in authselect"
+  else
+    # Fallback to local
+    sudo authselect select local with-fingerprint --force || warn "Could not enable with-fingerprint in authselect"
+  fi
 fi
 
 # PAM configurations for dual-auth (fingerprint + password)

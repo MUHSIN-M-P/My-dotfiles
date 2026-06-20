@@ -248,7 +248,8 @@ PanelWindow {
 
                     // Main fingerprint icon
                     NIcon {
-                        anchors.centerIn: parent
+                        anchors.fill: parent
+                        Layout.alignment: Qt.AlignHCenter
                         icon: "fingerprint"
                         pointSize: 48
                         color: fpSuccess ? Color.mPrimary :

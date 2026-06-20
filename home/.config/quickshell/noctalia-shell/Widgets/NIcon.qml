@@ -27,4 +27,5 @@ Text {
   color: Color.mOnSurface
   verticalAlignment: Text.AlignVCenter
   horizontalAlignment: Text.AlignHCenter
+  Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
 }

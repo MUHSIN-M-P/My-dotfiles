@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+# wallpaper-fetch — Download curated wallpapers from Wallhaven or Picsum and sync with Noctalia/Wallcards.
+
+set -euo pipefail
+
+# Helper to find Pictures directory
+get_pictures_dir() {
+    if command -v xdg-user-dir &> /dev/null; then
+        xdg-user-dir PICTURES
+        return
+    fi
+
+    local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/user-dirs.dirs"
+    if [ -f "$config_file" ]; then
+        local pictures_path
+        pictures_path=$(source "$config_file" >/dev/null 2>&1; echo "$XDG_PICTURES_DIR")
+        echo "${pictures_path/#\$HOME/$HOME}"
+        return
+    fi
+
+    echo "$HOME/Pictures"
+}
+
+PICTURES_DIR=$(get_pictures_dir)
+WALLPAPER_DIR="$PICTURES_DIR/Wallpapers"
+mkdir -p "$WALLPAPER_DIR"
+
+BULK_COUNT=1
+DOWNLOAD_ONLY=0
+STYLE_MODE="mixed"
+MIN_POOL=40
+MAX_POOL=200
+NO_CONFIRM=0
+
+# Parse options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --bulk)
+            BULK_COUNT="$2"
+            shift 2
+            ;;
+        --download-only)
+            DOWNLOAD_ONLY=1
+            shift
+            ;;
+        --style)
+            STYLE_MODE="$2"
+            shift 2
+            ;;
+        --no-confirm)
+            NO_CONFIRM=1
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Usage: $0 [--bulk COUNT] [--download-only] [--style MODE] [--no-confirm]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if ! [[ "$BULK_COUNT" =~ ^[0-9]+$ ]] || [[ "$BULK_COUNT" -lt 1 ]]; then
+    BULK_COUNT=1
+fi
+
+# Detect screen resolution
+read_screen_resolution() {
+    local width height
+    if command -v hyprctl &>/dev/null; then
+        width=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[0].width // empty')
+        height=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[0].height // empty')
+    fi
+
+    if [[ -z "$width" || -z "$height" || "$width" == "null" || "$height" == "null" ]]; then
+        width=1920
+        height=1080
+    fi
+
+    echo "${width}x${height}"
+}
+
+RESOLUTION=$(read_screen_resolution)
+
+STYLE_2_QUERIES=(
+    "cyberpunk neon city rain night futuristic"
+    "sci fi city lights noir"
+    "futuristic skyline synthwave"
+)
+
+STYLE_3_QUERIES=(
+    "minimal dark abstract geometry"
+    "dark gradient abstract clean"
+    "moody minimal texture"
+)
+
+choose_query() {
+    local query
+    case "$STYLE_MODE" in
+        2)
+            query="${STYLE_2_QUERIES[$((RANDOM % ${#STYLE_2_QUERIES[@]}))]}"
+            ;;
+        3)
+            query="${STYLE_3_QUERIES[$((RANDOM % ${#STYLE_3_QUERIES[@]}))]}"
+            ;;
+        mixed|*)
+            if (( RANDOM % 2 == 0 )); then
+                query="${STYLE_2_QUERIES[$((RANDOM % ${#STYLE_2_QUERIES[@]}))]}"
+            else
+                query="${STYLE_3_QUERIES[$((RANDOM % ${#STYLE_3_QUERIES[@]}))]}"
+            fi
+            ;;
+    esac
+    echo "$query"
+}
+
+fetch_wallhaven_link() {
+    local attempts=0
+    local page seed query api_url response link
+
+    while [[ "$attempts" -lt 5 ]]; do
+        query="$(choose_query)"
+        page=1
+        seed="$(date +%s)$RANDOM"
+
+        # Categories: 110 = General + Anime
+        # Purity: 100 = SFW
+        api_url="https://wallhaven.cc/api/v1/search?categories=110&purity=100&sorting=random&atleast=${RESOLUTION}&page=${page}&seed=${seed}&q=${query// /+}"
+        response=$(curl -fsSL "$api_url" 2>/dev/null || true)
+        if [[ -n "$response" ]]; then
+            link=$(echo "$response" | jq -r --argjson rand "$RANDOM" '.data | if length > 0 then .[$rand % length].path else empty end' 2>/dev/null)
+            if [[ -n "$link" && "$link" != "null" ]]; then
+                echo "$link"
+                return 0
+            fi
+        fi
+        attempts=$((attempts + 1))
+    done
+
+    # Ultimate fallback: general Wallhaven search without query, which is guaranteed to succeed
+    api_url="https://wallhaven.cc/api/v1/search?categories=110&purity=100&sorting=random&atleast=${RESOLUTION}&page=1"
+    response=$(curl -fsSL "$api_url" 2>/dev/null || true)
+    if [[ -n "$response" ]]; then
+        link=$(echo "$response" | jq -r --argjson rand "$RANDOM" '.data | if length > 0 then .[$rand % length].path else empty end' 2>/dev/null)
+        if [[ -n "$link" && "$link" != "null" ]]; then
+            echo "$link"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+make_unique_path() {
+    local ext="$1"
+    local ts rand path
+    ts="$(date +%Y%m%d_%H%M%S)"
+    rand="$RANDOM"
+    path="$WALLPAPER_DIR/random_wallpaper_${ts}_${rand}.${ext}"
+    echo "$path"
+}
+
+prune_wallpaper_cache() {
+    local keep="$MAX_POOL"
+    local files
+    # Only match wallpapers downloaded by this script or similar patterns
+    mapfile -t files < <(ls -1t "$WALLPAPER_DIR"/random_wallpaper_* 2>/dev/null)
+    if [[ "${#files[@]}" -le "$keep" ]]; then
+        return
+    fi
+    printf '%s\n' "${files[@]:$keep}" | xargs -r rm -f
+}
+
+count_pool() {
+    find "$WALLPAPER_DIR" -maxdepth 1 -type f \( -name 'random_wallpaper*' -o -name 'random_wallhaven*' \) | wc -l
+}
+
+pick_random_from_pool() {
+    local chosen
+    chosen=$(find "$WALLPAPER_DIR" -maxdepth 1 -type f \( -name 'random_wallpaper*' -o -name 'random_wallhaven*' \) | shuf -n 1)
+    echo "$chosen"
+}
+
+# Ensure minimum pool size
+pool_size="$(count_pool)"
+if [[ "$pool_size" -lt "$MIN_POOL" && "$NO_CONFIRM" -eq 1 ]]; then
+    # First-time fill: grab extra images to build a useful rotation pool.
+    BULK_COUNT=$((BULK_COUNT + MIN_POOL - pool_size))
+    if [[ "$BULK_COUNT" -gt 30 ]]; then
+        BULK_COUNT=30
+    fi
+fi
+
+notify-send "Wallpaper Downloader" "Fetching $BULK_COUNT new wallpaper(s) from Wallhaven..." -a "Wallpaper" || true
+
+downloaded_paths=()
+for ((i=1; i<=BULK_COUNT; i++)); do
+    link="$(fetch_wallhaven_link || true)"
+    ext="jpg"
+
+    if [[ -z "$link" ]]; then
+        # Fallback to Picsum
+        res_w="${RESOLUTION%x*}"
+        res_h="${RESOLUTION#*x}"
+        link="https://picsum.photos/${res_w}/${res_h}"
+        ext="jpg"
+    else
+        ext=$(echo "$link" | awk -F. '{print $NF}')
+        [[ -z "$ext" ]] && ext="jpg"
+    fi
+
+    # If BULK_COUNT is 1 and NO_CONFIRM is 0, download to a temporary file for confirmation
+    if [[ "$BULK_COUNT" -eq 1 && "$NO_CONFIRM" -eq 0 ]]; then
+        downloadPath="/tmp/fetched_wallpaper_preview.${ext}"
+    else
+        downloadPath="$(make_unique_path "$ext")"
+    fi
+
+    if curl -fL "$link" -o "$downloadPath" >/dev/null 2>&1; then
+        downloaded_paths+=("$downloadPath")
+    fi
+done
+
+if [[ "${#downloaded_paths[@]}" -eq 0 ]]; then
+    notify-send "Wallpaper Downloader" "Could not fetch wallpapers from the internet." -a "Wallpaper"
+    exit 1
+fi
+
+# If we downloaded to a temporary file for confirmation, run the interactive prompt
+if [[ "$BULK_COUNT" -eq 1 && "$NO_CONFIRM" -eq 0 ]]; then
+    temp_file="${downloaded_paths[0]}"
+    
+    # Trigger notification and wait for action
+    action=$(notify-send \
+      -A accept="Accept" \
+      -A deny="Deny" \
+      -i preferences-desktop-wallpaper \
+      -h "string:image-path:$temp_file" \
+      "Wallpaper Downloader" \
+      "Do you want to save and apply this fetched wallpaper?" \
+      -t 0 || true)
+
+    if [[ "$action" == "accept" ]]; then
+        # User accepted! Move to final destination and set
+        final_ext="${temp_file##*.}"
+        finalPath="$(make_unique_path "$final_ext")"
+        mv "$temp_file" "$finalPath"
+        
+        prune_wallpaper_cache
+
+        # Refresh list
+        if command -v qs &>/dev/null; then
+            qs -c noctalia-shell ipc call wallpaper refresh >/dev/null 2>&1 || true
+        fi
+
+        if [[ "$DOWNLOAD_ONLY" -eq 0 ]]; then
+            if [ -x "$HOME/.local/bin/wallcards-video" ]; then
+                "$HOME/.local/bin/wallcards-video" clear >/dev/null 2>&1 || true
+            fi
+
+            if command -v qs &>/dev/null; then
+                qs -c noctalia-shell ipc call wallpaper set "$finalPath" "" >/dev/null 2>&1 || true
+            fi
+            notify-send "Wallpaper Downloader" "Applied new wallpaper: $(basename "$finalPath")" -a "Wallpaper" || true
+        else
+            notify-send "Wallpaper Downloader" "Saved new wallpaper: $(basename "$finalPath")" -a "Wallpaper" || true
+        fi
+    else
+        # User denied or dismissed
+        rm -f "$temp_file"
+        notify-send "Wallpaper Downloader" "Wallpaper fetch discarded." -a "Wallpaper" || true
+    fi
+else
+    # Non-interactive bulk/direct flow
+    prune_wallpaper_cache
+
+    if command -v qs &>/dev/null; then
+        qs -c noctalia-shell ipc call wallpaper refresh >/dev/null 2>&1 || true
+    fi
+
+    if [[ "$DOWNLOAD_ONLY" -eq 0 ]]; then
+        chosen_path="$(pick_random_from_pool)"
+        if [[ -z "$chosen_path" ]]; then
+            chosen_path="${downloaded_paths[0]}"
+        fi
+
+        if [ -x "$HOME/.local/bin/wallcards-video" ]; then
+            "$HOME/.local/bin/wallcards-video" clear >/dev/null 2>&1 || true
+        fi
+
+        if command -v qs &>/dev/null; then
+            qs -c noctalia-shell ipc call wallpaper set "$chosen_path" "" >/dev/null 2>&1 || true
+        fi
+
+        notify-send "Wallpaper Downloader" "Applied new wallpaper: $(basename "$chosen_path")" -a "Wallpaper" || true
+    else
+        notify-send "Wallpaper Downloader" "Downloaded ${#downloaded_paths[@]} new wallpaper(s) to pool." -a "Wallpaper" || true
+    fi
+fi

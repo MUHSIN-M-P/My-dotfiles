@@ -128,6 +128,7 @@ pull_from_system() {
   SUDO_CP /etc/pam.d/sudo                             "$HERE/system/etc/pam.d/sudo"
   SUDO_CP /etc/pam.d/sddm                             "$HERE/system/etc/pam.d/sddm"
   SUDO_CP /etc/pam.d/polkit-1                         "$HERE/system/etc/pam.d/polkit-1"
+  SUDO_CP /etc/udev/rules.d/70-libfprint-0c90.rules   "$HERE/system/etc/udev/rules.d/70-libfprint-0c90.rules"
 
   for s in dnf-makecache fstrim packagekit plocate-updatedb; do
     mkdir -p "$HERE/system/etc/systemd/system/$s.service.d"
@@ -231,6 +232,7 @@ check_drift() {
   check_file /etc/pam.d/sudo "$HERE/system/etc/pam.d/sudo"
   check_file /etc/pam.d/sddm "$HERE/system/etc/pam.d/sddm"
   check_file /etc/pam.d/polkit-1 "$HERE/system/etc/pam.d/polkit-1"
+  check_file /etc/udev/rules.d/70-libfprint-0c90.rules "$HERE/system/etc/udev/rules.d/70-libfprint-0c90.rules"
 
   for s in dnf-makecache fstrim packagekit plocate-updatedb; do
     check_file /etc/systemd/system/"$s".service.d/override.conf "$HERE/system/etc/systemd/system/$s.service.d/override.conf"
@@ -280,6 +282,7 @@ view_diffs() {
   diff_file /etc/pam.d/sudo "$HERE/system/etc/pam.d/sudo"
   diff_file /etc/pam.d/sddm "$HERE/system/etc/pam.d/sddm"
   diff_file /etc/pam.d/polkit-1 "$HERE/system/etc/pam.d/polkit-1"
+  diff_file /etc/udev/rules.d/70-libfprint-0c90.rules "$HERE/system/etc/udev/rules.d/70-libfprint-0c90.rules"
 
   if [ "$count" = 0 ]; then
     echo -e "  \033[1;32m✔ No file differences detected.\033[0m"

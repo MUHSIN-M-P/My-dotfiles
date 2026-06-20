@@ -44,7 +44,7 @@ Item {
         smooth: true
         asynchronous: true
         antialiasing: true
-        fillMode: root.imageFillMode
+        fillMode: Image.Stretch
       }
     }
 
@@ -57,7 +57,7 @@ Item {
         smooth: true
         asynchronous: true
         antialiasing: true
-        fillMode: root.imageFillMode
+        fillMode: Image.Stretch
         playing: true
       }
     }
