@@ -5,7 +5,8 @@ import QtQuick
 Rectangle {
   id: loadingBar
 
-  property bool loading: pending > 0
+  property bool loading: pending > 0 || message !== ""
+  property string message: ""
   required property int pending
   property real progress: total > 0 ? 1 - (pending / total) : 0
   required property int total
@@ -70,7 +71,7 @@ Rectangle {
     }
 
     NText {
-      text: `${root.pluginApi?.tr("widget.generate-thumbs-message")} ${String(Math.max(loadingBar.total - loadingBar.pending, 0)).padStart(String(loadingBar.total).length, " ")} / ${loadingBar.total}`
+      text: loadingBar.message !== "" ? loadingBar.message : `${root.pluginApi?.tr("widget.generate-thumbs-message")} ${String(Math.max(loadingBar.total - loadingBar.pending, 0)).padStart(String(loadingBar.total).length, " ")} / ${loadingBar.total}`
     }
   }
 

@@ -98,8 +98,10 @@ done
 say "5/9  Applying ./system/* (needs sudo)"
 #------------------------------------------------------------------------------
 sudo install -m 0640 "$HERE/system/etc/sudoers.d/charge-limit" /etc/sudoers.d/charge-limit
+sudo install -m 0640 "$HERE/system/etc/sudoers.d/asus-fan-control" /etc/sudoers.d/asus-fan-control
 sudo install -m 0644 "$HERE/system/etc/tmpfiles.d/charge-limit.conf" /etc/tmpfiles.d/charge-limit.conf
 sudo install -m 0755 "$HERE/system/usr/local/bin/charge-limit" /usr/local/bin/charge-limit
+sudo install -m 0755 "$HERE/system/usr/local/bin/asus-fan-control" /usr/local/bin/asus-fan-control
 # Bluetooth main.conf — back up existing, then install ours.
 if [ -f /etc/bluetooth/main.conf ] && ! cmp -s "$HERE/system/etc/bluetooth/main.conf" /etc/bluetooth/main.conf; then
   sudo cp -a /etc/bluetooth/main.conf /etc/bluetooth/main.conf.preinst.bak

@@ -97,7 +97,7 @@ pull_from_system() {
   for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
            hyprland-dialog hyprland-update-screen hyprland-guiutils \
            noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl \
-           sysupdate sysfind nvrun; do
+           sysupdate sysfind nvrun sys-stats-period wallpaper-fetch; do
     CP ~/.local/bin/"$s"                              "$HERE/home/.local/bin/$s"
   done
   for f in brave-browser.desktop org.gnome.Settings.desktop; do
@@ -116,10 +116,12 @@ pull_from_system() {
            "$HERE/system/etc/pam.d"
 
   SUDO_CP /etc/sudoers.d/charge-limit                 "$HERE/system/etc/sudoers.d/charge-limit"
+  SUDO_CP /etc/sudoers.d/asus-fan-control             "$HERE/system/etc/sudoers.d/asus-fan-control"
   SUDO_CP /etc/sudoers.d/sddm-wallpaper               "$HERE/system/etc/sudoers.d/sddm-wallpaper"
   SUDO_CP /etc/tmpfiles.d/charge-limit.conf           "$HERE/system/etc/tmpfiles.d/charge-limit.conf"
   SUDO_CP /etc/bluetooth/main.conf                    "$HERE/system/etc/bluetooth/main.conf"
   SUDO_CP /usr/local/bin/charge-limit                 "$HERE/system/usr/local/bin/charge-limit"
+  SUDO_CP /usr/local/bin/asus-fan-control             "$HERE/system/usr/local/bin/asus-fan-control"
   SUDO_CP /etc/systemd/system.conf.d/limits.conf      "$HERE/system/etc/systemd/system.conf.d/limits.conf"
   SUDO_CP /etc/systemd/user.conf.d/limits.conf        "$HERE/system/etc/systemd/user.conf.d/limits.conf"
   SUDO_CP /etc/security/limits.d/99-nofile-limits.conf "$HERE/system/etc/security/limits.d/99-nofile-limits.conf"
@@ -211,7 +213,7 @@ check_drift() {
   done
 
   # Helpers & overrides
-  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun; do
+  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch; do
     check_file ~/.local/bin/"$s" "$HERE/home/.local/bin/$s"
   done
   for f in brave-browser.desktop org.gnome.Settings.desktop; do
@@ -220,10 +222,12 @@ check_drift() {
 
   # System files
   check_file /etc/sudoers.d/charge-limit "$HERE/system/etc/sudoers.d/charge-limit"
+  check_file /etc/sudoers.d/asus-fan-control "$HERE/system/etc/sudoers.d/asus-fan-control"
   check_file /etc/sudoers.d/sddm-wallpaper "$HERE/system/etc/sudoers.d/sddm-wallpaper"
   check_file /etc/tmpfiles.d/charge-limit.conf "$HERE/system/etc/tmpfiles.d/charge-limit.conf"
   check_file /etc/bluetooth/main.conf "$HERE/system/etc/bluetooth/main.conf"
   check_file /usr/local/bin/charge-limit "$HERE/system/usr/local/bin/charge-limit"
+  check_file /usr/local/bin/asus-fan-control "$HERE/system/usr/local/bin/asus-fan-control"
   check_file /etc/systemd/system.conf.d/limits.conf "$HERE/system/etc/systemd/system.conf.d/limits.conf"
   check_file /etc/systemd/user.conf.d/limits.conf "$HERE/system/etc/systemd/user.conf.d/limits.conf"
   check_file /etc/security/limits.d/99-nofile-limits.conf "$HERE/system/etc/security/limits.d/99-nofile-limits.conf"
@@ -267,7 +271,7 @@ view_diffs() {
   done
 
   # Helpers
-  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun; do
+  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period; do
     diff_file ~/.local/bin/"$s" "$HERE/home/.local/bin/$s"
   done
 
@@ -313,7 +317,7 @@ scan_untracked() {
     if [ -f "$script" ]; then
       local base=$(basename "$script")
       case "$base" in
-        charge-limit|wallcards-video|prewarm-apps|toggle-fan-profile|hyprland-dialog|hyprland-update-screen|hyprland-guiutils|noctalia-session-cleanup|restore-power-profile|update-sddm-wallpaper|waybarctl|sysupdate|sysfind|nvrun) ;;
+        charge-limit|wallcards-video|prewarm-apps|toggle-fan-profile|hyprland-dialog|hyprland-update-screen|hyprland-guiutils|noctalia-session-cleanup|restore-power-profile|update-sddm-wallpaper|waybarctl|sysupdate|sysfind|nvrun|sys-stats-period|wallpaper-fetch) ;;
         *)
           echo -e "  \033[1;33m[UNTRACKED SCRIPT]\033[0m ~/.local/bin/$base"
           found=1

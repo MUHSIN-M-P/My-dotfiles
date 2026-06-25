@@ -46,6 +46,7 @@ A practical, beginner-friendly guide for the Hyprland + Noctalia desktop on Fedo
 38. [Dedicated GPU Launcher Wrapper (nvrun)](#38-dedicated-gpu-launcher-wrapper-nvrun)
 39. [Elan Match-on-Chip Fingerprint Setup](#39-elan-match-on-chip-fingerprint-setup)
 40. [Hyprland 120Hz Rendering & Animation Performance Tuning](#40-hyprland-120hz-rendering--animation-performance-tuning)
+41. [System Statistics & Historical Tracking (sys-stats-period)](#41-system-statistics--historical-tracking-sys-stats-period)
 
 ---
 
@@ -1522,3 +1523,44 @@ We customized the rendering curves to create a modern, buttery-smooth environmen
     ```bash
     hyprctl configerrors
     ```
+
+---
+
+## 41. System Statistics & Historical Tracking (sys-stats-period)
+
+To monitor historical network bandwidth and system uptime without interactive overhead or packet sniffing, two backend utilities run natively in the background: **vnStat** and **tuptime**.
+
+A wrapper command, `sys-stats-period`, is available to query both utilities over specific date ranges.
+
+### 41.1 Initial Setup
+To enable these tracking systems:
+```bash
+# Install vnstat and tuptime
+sudo dnf install -y vnstat tuptime
+
+# Start and enable the services/timers
+sudo systemctl enable --now vnstat.service tuptime.service tuptime-sync.timer
+
+# Force initial database updates (if needed)
+sudo -u vnstat vnstat -u
+```
+
+### 41.2 Command Usage
+You can run `sys-stats-period` with relative ranges or absolute date parameters:
+*   **Last 7 Days (Default):**
+    ```bash
+    sys-stats-period
+    ```
+*   **Last 30 Days:**
+    ```bash
+    sys-stats-period --start 30d
+    ```
+*   **Specific Calendar Range:**
+    ```bash
+    sys-stats-period --start 2026-06-01 --end 2026-06-15
+    ```
+
+### 41.3 Under the Hood
+*   **vnStat:** Consumes only 3-5 MB of RAM and 0% CPU. It periodically fetches bytes count directly from the kernel (`/proc/net/dev`) rather than sniffing raw packets.
+*   **tuptime:** Runs transiently on startup, shutdown, and every few minutes via systemd timers to write session state to `/var/lib/tuptime/tuptime.db` (consuming 0 MB persistent memory).
+*   **CLI wrapper:** The python script is located at `~/.local/bin/sys-stats-period` (managed in dotfiles at `home/.local/bin/sys-stats-period`).

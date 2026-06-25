@@ -20,6 +20,8 @@ Item {
   readonly property bool showFallback: fallbackIcon !== "" && (imagePath === "" || (imageSource && imageSource.status === Image.Error))
   readonly property int status: imageSource ? imageSource.status : Image.Null
 
+
+
   Rectangle {
     anchors.fill: parent
     radius: root.radius

@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# asus-fan-control — toggle or set fan control mode to manual (full speed) or automatic.
+# Usage:
+#   asus-fan-control max     (or full / 5000) -> Sets fan to maximum speed (manual mode, pwm1_enable=0)
+#   asus-fan-control auto    (or restore / default) -> Sets fan to automatic (pwm1_enable=2)
+#   asus-fan-control toggle  -> Toggles between max and auto
+#   asus-fan-control status  -> Shows current status and fan speed in RPM
+#
+# Writes /sys/class/hwmon/hwmon*/pwm1_enable.
+# Needs root for writing; intended to be invoked via sudo (NOPASSWD set up
+# at /etc/sudoers.d/asus-fan-control).
+
+set -euo pipefail
+
+# Find ASUS hwmon directory
+ASUS_HWMON=""
+for d in /sys/class/hwmon/hwmon*; do
+  if [ -f "$d/name" ] && [ "$(cat "$d/name")" = "asus" ]; then
+    ASUS_HWMON="$d"
+    break
+  fi
+done
+
+if [ -z "$ASUS_HWMON" ]; then
+  echo "Error: No ASUS hwmon device found under /sys/class/hwmon/" >&2
+  exit 1
+fi
+
+ENABLE_FILE="$ASUS_HWMON/pwm1_enable"
+INPUT_FILE="$ASUS_HWMON/fan1_input"
+
+if [ ! -f "$ENABLE_FILE" ]; then
+  echo "Error: $ENABLE_FILE does not exist" >&2
+  exit 1
+fi
+
+cmd="${1:-status}"
+
+send_notification() {
+  local msg="$1"
+  local icon="$2"
+  if [ -n "${SUDO_USER:-}" ] && command -v notify-send >/dev/null; then
+    sudo -u "$SUDO_USER" -- env DISPLAY="${DISPLAY:-}" \
+      WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}" \
+      XDG_RUNTIME_DIR="/run/user/$(id -u "$SUDO_USER")" \
+      notify-send -h string:x-canonical-private-synchronous:fan-speed \
+        -a "System" \
+        -i "$icon" \
+        -t 2000 \
+        "Fan Speed Control" "$msg" 2>/dev/null || true
+  elif command -v notify-send >/dev/null; then
+    notify-send -h string:x-canonical-private-synchronous:fan-speed \
+      -a "System" \
+      -i "$icon" \
+      -t 2000 \
+      "Fan Speed Control" "$msg" 2>/dev/null || true
+  fi
+}
+
+case "$cmd" in
+  status)
+    cur_enable=$(cat "$ENABLE_FILE")
+    cur_rpm="N/A"
+    if [ -f "$INPUT_FILE" ]; then
+      cur_rpm=$(cat "$INPUT_FILE")
+    fi
+    case "$cur_enable" in
+      0) status_msg="Max (Manual, 5000 RPM)" ;;
+      2) status_msg="Auto (BIOS Controlled)" ;;
+      *) status_msg="Unknown ($cur_enable)" ;;
+    esac
+    echo "mode=$status_msg  rpm=${cur_rpm}  file=$ENABLE_FILE"
+    ;;
+  max|full|5000)
+    [ "$EUID" -eq 0 ] || { echo "needs root: run via sudo" >&2; exit 1; }
+    echo 0 > "$ENABLE_FILE"
+    echo "Fan set to MAX (Manual mode, ~5000 RPM)"
+    send_notification "Fan speed set to MAX (~5000 RPM) 🌪️" "fan-symbolic"
+    ;;
+  auto|restore|default)
+    [ "$EUID" -eq 0 ] || { echo "needs root: run via sudo" >&2; exit 1; }
+    echo 2 > "$ENABLE_FILE"
+    echo "Fan set to AUTO (BIOS controlled)"
+    send_notification "Fan speed set to AUTO (BIOS controlled) 🍃" "fan-symbolic"
+    ;;
+  toggle)
+    cur_enable=$(cat "$ENABLE_FILE")
+    if [ "$cur_enable" = "0" ]; then
+      # Currently max, set to auto
+      exec sudo "$0" auto
+    else
+      # Currently auto (or anything else), set to max
+      exec sudo "$0" max
+    fi
+    ;;
+  *)
+    echo "Usage: asus-fan-control {max|auto|toggle|status}" >&2
+    exit 2
+    ;;
+esac

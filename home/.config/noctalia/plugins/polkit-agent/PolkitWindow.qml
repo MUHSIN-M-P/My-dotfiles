@@ -193,7 +193,7 @@ PanelWindow {
             // ── Fingerprint zone (always shown) ────────────────────────────
             ColumnLayout {
                 id: fpZone
-                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: Style.marginL * 1.5
                 Layout.bottomMargin: Style.marginS
                 spacing: Style.marginM
@@ -248,8 +248,7 @@ PanelWindow {
 
                     // Main fingerprint icon
                     NIcon {
-                        anchors.fill: parent
-                        Layout.alignment: Qt.AlignHCenter
+                        anchors.centerIn: parent
                         icon: "fingerprint"
                         pointSize: 48
                         color: fpSuccess ? Color.mPrimary :

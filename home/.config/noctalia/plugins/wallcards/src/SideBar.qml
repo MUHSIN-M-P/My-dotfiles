@@ -83,6 +83,10 @@ Rectangle {
       text: root.pluginApi?.tr("shortcuts.header.actions")
     }
     ShortcutHint {
+      keys: "D"
+      label: root.pluginApi?.tr("shortcuts.label.fetch-wallpapers")
+    }
+    ShortcutHint {
       keys: "ENTER"
       label: root.pluginApi?.tr("shortcuts.label.apply-quit")
     }

@@ -138,6 +138,17 @@ PanelWindow {
     running: false
   }
 
+  Process {
+    id: fetcher
+
+    command: ["/home/ldzbeta/.local/bin/wallpaper-fetch", "--bulk", "3", "--download-only"]
+    running: false
+
+    onExited: {
+      thumbnailService.createThumbnails();
+    }
+  }
+
   Connections {
     function onFilesChanged() {
       root.applyFilterToFiles();
@@ -309,6 +320,11 @@ PanelWindow {
 
       const bindings = {
         [Qt.Key_Question]: () => sideBar.expanded = !sideBar.expanded,
+        [Qt.Key_D]: () => {
+          if (!fetcher.running) {
+            fetcher.running = true;
+          }
+        },
         [Qt.Key_Q]: () => root.close(),
         [Qt.Key_Return]: () => {
           root.applyCurrentCard();
@@ -360,6 +376,7 @@ PanelWindow {
       anchors.centerIn: parent
       pending: thumbnailService.pendingProcesses
       total: thumbnailService.fileCount
+      message: fetcher.running ? "Fetching wallpapers from Wallhaven..." : ""
     }
 
     TopBar {

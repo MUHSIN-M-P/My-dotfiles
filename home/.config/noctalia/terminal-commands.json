@@ -1,5 +1,11 @@
 [
   {
+    "keys": "wallpaper-fetch",
+    "desc": "Fetch Curated Wallpapers",
+    "explanation": "Downloads general SFW wallpapers from Wallhaven and syncs them to Wallcards.",
+    "command": "wallpaper-fetch"
+  },
+  {
     "keys": "sysupdate",
     "desc": "Update System Packages",
     "explanation": "Runs the system-wide upgrade script to fetch and install Fedora updates.",
