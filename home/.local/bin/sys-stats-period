@@ -158,6 +158,157 @@ def run_tuptime(start_date, end_date):
     except Exception as e:
         return f"Error running tuptime: {e}"
 
+def parse_tuptime_stats(output_str):
+    stats = {}
+    for line in output_str.split('\n'):
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+        line_lower = line_stripped.lower()
+        if line_lower.startswith("system startups:"):
+            stats["startups"] = line_stripped
+        elif line_lower.startswith("system shutdowns:"):
+            stats["shutdowns"] = line_stripped
+        elif line_lower.startswith("system life:"):
+            stats["life"] = line_stripped
+        elif line_lower.startswith("longest uptime:"):
+            stats["longest"] = line_stripped
+        elif line_lower.startswith("average uptime:"):
+            stats["average"] = line_stripped
+        elif line_lower.startswith("system uptime:"):
+            stats["system_uptime"] = line_stripped
+            parts = line_stripped.split()
+            if len(parts) > 2:
+                try:
+                    stats["system_uptime_pct"] = float(parts[2].rstrip('%'))
+                except ValueError:
+                    pass
+        elif line_lower.startswith("current uptime:"):
+            stats["current"] = line_stripped
+    return stats
+
+def get_system_intervals(since_epoch, until_epoch):
+    """Run tuptime -l -s and return a list of active system intervals (start, end)."""
+    cmd = ["tuptime", "--tsince", str(since_epoch), "--tuntil", str(until_epoch), "-l", "-s"]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            return []
+        
+        intervals = []
+        lines = res.stdout.strip().split('\n')
+        current_startup = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            if line.startswith("Startup:"):
+                parts = line.split()
+                if "at" in parts:
+                    idx = parts.index("at")
+                    if idx + 1 < len(parts):
+                        current_startup = int(parts[idx + 1])
+                else:
+                    current_startup = since_epoch
+            elif line.startswith("Uptime:"):
+                parts = line.split()
+                if len(parts) >= 2 and current_startup is not None:
+                    uptime = int(parts[1])
+                    intervals.append((current_startup, current_startup + uptime))
+                current_startup = None
+                
+        return intervals
+    except Exception:
+        return []
+
+def get_lock_intervals(since_epoch, until_epoch, system_intervals):
+    """
+    Read the lock log and calculate total locked seconds within the specified epoch range,
+    restricted to when the system was actually running (system_intervals).
+    """
+    log_path = "/home/ldzbeta/.local/state/sys-stats-lock.log"
+    if not os.path.exists(log_path):
+        return 0
+        
+    events = []
+    try:
+        with open(log_path, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) == 2:
+                    try:
+                        ts = int(parts[0])
+                        evt = parts[1].lower()
+                        if evt in ('lock', 'unlock'):
+                            events.append((ts, evt))
+                    except ValueError:
+                        continue
+    except Exception:
+        return 0
+        
+    if not events:
+        return 0
+        
+    events.sort(key=lambda x: x[0])
+    total_locked_seconds = 0
+    
+    for sys_start, sys_end in system_intervals:
+        sys_events = [e for e in events if sys_start <= e[0] <= sys_end]
+        is_locked = False
+        lock_start = None
+        
+        for ts, evt in sys_events:
+            if evt == 'lock':
+                if not is_locked:
+                    is_locked = True
+                    lock_start = ts
+            elif evt == 'unlock':
+                if is_locked:
+                    t_start = max(lock_start, since_epoch)
+                    t_end = min(ts, until_epoch)
+                    if t_start < t_end:
+                        total_locked_seconds += (t_end - t_start)
+                    is_locked = False
+                    lock_start = None
+                    
+        if is_locked and lock_start is not None:
+            t_start = max(lock_start, since_epoch)
+            t_end = min(sys_end, until_epoch)
+            if t_start < t_end:
+                total_locked_seconds += (t_end - t_start)
+                
+    return total_locked_seconds
+
+def format_duration(seconds):
+    """Format seconds into Xd Xh Xm Xs matching tuptime's padding behavior."""
+    if seconds < 0:
+        seconds = 0
+    d = seconds // (24 * 3600)
+    seconds %= (24 * 3600)
+    h = seconds // 3600
+    seconds %= 3600
+    m = seconds // 60
+    s = seconds % 60
+    
+    parts = []
+    if d > 0:
+        parts.append(f"{d}d")
+        parts.append(f"{h:02d}h")
+        parts.append(f"{m:02d}m")
+        parts.append(f"{s:02d}s")
+    elif h > 0:
+        parts.append(f"{h}h")
+        parts.append(f"{m:02d}m")
+        parts.append(f"{s:02d}s")
+    elif m > 0:
+        parts.append(f"{m}m")
+        parts.append(f"{s:02d}s")
+    else:
+        parts.append(f"{s}s")
+    return " ".join(parts)
+
 def main():
     parser = argparse.ArgumentParser(
         description="Calculate system network usage and historical uptime for a particular time period.",
@@ -238,14 +389,88 @@ def main():
         print(f"  [-] Network statistics query failed: {net_data}")
         
     # 5. Gather & Display Uptime Data
-    print(f"\n[+] System Uptime / Downtime Statistics")
+    print(f"\n[+] System Uptime Statistics")
     uptime_data = run_tuptime(start_date, end_date)
-    if uptime_data:
-        # Standardize indentation for beauty
-        indented_lines = []
-        for line in uptime_data.split('\n'):
-            indented_lines.append(f"  {line}")
-        print("\n".join(indented_lines))
+    if uptime_data.startswith("Permission Denied") or uptime_data.startswith("Error running tuptime"):
+        print(f"  [-] {uptime_data}")
+    elif uptime_data:
+        # Parse period stats
+        period_stats = parse_tuptime_stats(uptime_data)
+        
+        # Fetch today's uptime stats
+        today_date = datetime.now().date()
+        today_data = run_tuptime(today_date, today_date)
+        today_stats = {}
+        if today_data and not (today_data.startswith("Permission Denied") or today_data.startswith("Error running tuptime")):
+            today_stats = parse_tuptime_stats(today_data)
+            
+        # Display stats
+        if "startups" in period_stats:
+            print(f"  {period_stats['startups']}")
+        if "shutdowns" in period_stats:
+            print(f"  {period_stats['shutdowns']}")
+        if "life" in period_stats:
+            print(f"  {period_stats['life']}")
+            
+        # Calculate start and end epoch for the period
+        start_dt = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0)
+        end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59)
+        since_epoch = int(start_dt.timestamp())
+        until_epoch = int(end_dt.timestamp())
+        
+        # System intervals and locked seconds for the period
+        period_intervals = get_system_intervals(since_epoch, until_epoch)
+        period_total_uptime = sum(end - start for start, end in period_intervals)
+        period_locked = get_lock_intervals(since_epoch, until_epoch, period_intervals)
+        period_active = max(0, period_total_uptime - period_locked)
+        
+        # Calculate period system life for active percentage
+        period_pct = period_stats.get("system_uptime_pct", 0.0)
+        if period_pct > 0.0:
+            period_life = period_total_uptime / (period_pct / 100.0)
+            period_active_pct = (period_active / period_life) * 100.0 if period_life > 0 else 0.0
+        else:
+            period_life = until_epoch - since_epoch
+            period_active_pct = (period_active / period_life) * 100.0 if period_life > 0 else 0.0
+            
+        # Today's stats
+        today_start_dt = datetime(today_date.year, today_date.month, today_date.day, 0, 0, 0)
+        today_end_dt = datetime(today_date.year, today_date.month, today_date.day, 23, 59, 59)
+        today_since_epoch = int(today_start_dt.timestamp())
+        today_until_epoch = int(today_end_dt.timestamp())
+        
+        today_intervals = get_system_intervals(today_since_epoch, today_until_epoch)
+        today_total_uptime = sum(end - start for start, end in today_intervals)
+        today_locked = get_lock_intervals(today_since_epoch, today_until_epoch, today_intervals)
+        today_active = max(0, today_total_uptime - today_locked)
+        
+        today_pct = today_stats.get("system_uptime_pct", 0.0)
+        if today_pct > 0.0:
+            today_life = today_total_uptime / (today_pct / 100.0)
+            today_active_pct = (today_active / today_life) * 100.0 if today_life > 0 else 0.0
+        else:
+            today_life = today_until_epoch - today_since_epoch
+            today_active_pct = (today_active / today_life) * 100.0 if today_life > 0 else 0.0
+        
+        has_details = any(k in period_stats for k in ["longest", "average", "system_uptime"]) or "system_uptime" in today_stats
+        if has_details:
+            print()
+            if "longest" in period_stats:
+                print(f"  {period_stats['longest']}")
+            if "average" in period_stats:
+                print(f"  {period_stats['average']}")
+            if "system_uptime" in period_stats:
+                active_pct_str = f"{period_active_pct:5.2f}%"
+                active_str = format_duration(period_active)
+                print(f"  System uptime:        {active_pct_str}  =  {active_str}")
+            if "system_uptime" in today_stats:
+                today_active_pct_str = f"{today_active_pct:5.2f}%"
+                today_active_str = format_duration(today_active)
+                print(f"  Today's uptime:       {today_active_pct_str}  =  {today_active_str}")
+                    
+        if "current" in period_stats:
+            print()
+            print(f"  {period_stats['current']}")
     else:
         print("  [-] Uptime statistics query returned no output.")
         

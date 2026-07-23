@@ -24,7 +24,7 @@ Item {
   readonly property int shadowPadding: Style.shadowBlurMax + Style.marginL
 
   width: notificationWidth + shadowPadding * 2
-  height: Math.round(contentLayout.implicitHeight + Style.margin2M * 2 + shadowPadding * 2)
+  height: Math.round(contentLayout.implicitHeight + (isCompact ? Style.marginS : Style.marginM) * 2 + shadowPadding * 2)
   visible: true
   opacity: 0
   scale: initialScale
@@ -282,11 +282,12 @@ Item {
 
   RowLayout {
     id: contentLayout
-    anchors.fill: background
-    anchors.topMargin: isCompact ? Style.marginS : Style.marginM
-    anchors.bottomMargin: isCompact ? Style.marginS : Style.marginM
+    anchors.left: background.left
+    anchors.right: background.right
+    anchors.top: background.top
     anchors.leftMargin: isCompact ? Style.marginM : Style.margin2M
     anchors.rightMargin: isCompact ? Style.marginM : Style.margin2M
+    anchors.topMargin: isCompact ? Style.marginS : Style.marginM
     spacing: isCompact ? Style.marginM : Style.marginL
 
     // Icon

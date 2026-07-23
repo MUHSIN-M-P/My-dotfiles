@@ -59,6 +59,7 @@ Singleton {
   property bool _internetConnectivity: false
   property string lastError: ""
   property int activeDetailsTtlMs: 10000
+  property string connectivityCheckUri: "http://fedoraproject.org/static/hotspot.txt"
 
   // Ethernet properties
   property var ethernetInterfaces: ([])
@@ -108,6 +109,7 @@ Singleton {
       if (ProgramCheckerService.nmcliAvailable) {
         deviceStatusProcess.running = true;
         connectivityCheckProcess.running = true;
+        fetchConnectivityUriProcess.running = true;
       }
     }
   }
@@ -120,6 +122,7 @@ Singleton {
     if (ProgramCheckerService.nmcliAvailable) {
       deviceStatusProcess.running = true;
       connectivityCheckProcess.running = true;
+      fetchConnectivityUriProcess.running = true;
     }
   }
 
@@ -284,6 +287,11 @@ Singleton {
     // Remove from system
     forgetProcess.ssid = ssid;
     forgetProcess.running = true;
+  }
+
+  function launchCaptivePortal() {
+    Logger.i("Network", "Launching captive portal login page using URI: " + connectivityCheckUri);
+    Quickshell.execDetached(["xdg-open", connectivityCheckUri]);
   }
 
   // Refresh details for the currently active Wi‑Fi link
@@ -740,14 +748,51 @@ Singleton {
         if (!r) {
           return;
         }
+        const oldConnectivity = root._networkConnectivity;
         root._networkConnectivity = (r === "none") ? "unknown" : r;
         root._internetConnectivity = (r === "full");
+
+        if (r === "portal" && oldConnectivity !== "portal") {
+          ToastService.showNotice(
+            I18n.tr("wifi.panel.action-required"),
+            I18n.tr("wifi.panel.action-required-desc"),
+            "wifi-exclamation",
+            10000,
+            I18n.tr("wifi.panel.sign-in"),
+            function() {
+              root.launchCaptivePortal();
+            }
+          );
+        }
       }
     }
     stderr: StdioCollector {
       onStreamFinished: {
         if (text.trim()) {
           Logger.w("Network", "Connectivity check error: " + text);
+        }
+      }
+    }
+  }
+
+  // Process to fetch the connectivity check URI configured in NetworkManager
+  Process {
+    id: fetchConnectivityUriProcess
+    running: false
+    command: ["sh", "-c", "gdbus call --system --dest org.freedesktop.NetworkManager --object-path /org/freedesktop/NetworkManager --method org.freedesktop.DBus.Properties.Get org.freedesktop.NetworkManager ConnectivityCheckUri | grep -oP \"(?<=\\<').*(?='\\>)\""]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        const uri = text.trim();
+        if (uri) {
+          root.connectivityCheckUri = uri;
+          Logger.d("Network", "Fetched ConnectivityCheckUri: " + uri);
+        }
+      }
+    }
+    stderr: StdioCollector {
+      onStreamFinished: {
+        if (text.trim()) {
+          Logger.w("Network", "Failed to fetch ConnectivityCheckUri: " + text);
         }
       }
     }

@@ -21,8 +21,8 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay  
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand  
   
-    ScreencopyView {  
-        captureSource: root.targetScreen
+    Image {  
+        source: (root.visible && root.tempPath) ? "file://" + root.tempPath : ""
         anchors.fill: parent  
         z: -1
     }  

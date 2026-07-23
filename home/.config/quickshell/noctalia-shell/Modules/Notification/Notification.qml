@@ -62,6 +62,7 @@ Variants {
     sourceComponent: PanelWindow {
       id: notifWindow
       screen: modelData
+      visible: notificationModel.count > 0
 
       WlrLayershell.namespace: "noctalia-notifications-" + (screen?.name || "unknown")
       WlrLayershell.layer: (Settings.data.notifications?.overlayLayer) ? WlrLayer.Overlay : WlrLayer.Top
@@ -148,7 +149,7 @@ Variants {
       margins.right: isRight ? barOffsetRight - shadowPadding + Style.marginM : 0
 
       implicitWidth: notifWidth + shadowPadding * 2
-      implicitHeight: notificationStack.implicitHeight + Style.marginL
+      implicitHeight: notificationModel.count > 0 ? (notificationStack.implicitHeight + Style.marginL) : 0
 
       property var animateConnection: null
 
@@ -604,7 +605,9 @@ Variants {
               ColumnLayout {
                 id: notificationContent
                 visible: !notifWindow.isCompact
-                anchors.fill: cardBackground
+                anchors.left: cardBackground.left
+                anchors.right: cardBackground.right
+                anchors.top: cardBackground.top
                 anchors.margins: Style.marginM
                 spacing: Style.marginM
 
@@ -696,7 +699,8 @@ Variants {
 
                     // Large Image Preview (Enlarged)
                     NImageRounded {
-                      visible: model.hasLargeImage && (model.cachedImage !== "" || model.originalImage !== "")
+                      id: largeImagePreview
+                      visible: model.hasLargeImage && (model.cachedImage !== "" || model.originalImage !== "") && largeImagePreview.status === Image.Ready
                       Layout.fillWidth: true
                       Layout.preferredHeight: Math.round(180 * Style.uiScaleRatio)
                       radius: Style.radiusM
@@ -775,7 +779,9 @@ Variants {
               RowLayout {
                 id: compactContent
                 visible: notifWindow.isCompact
-                anchors.fill: cardBackground
+                anchors.left: cardBackground.left
+                anchors.right: cardBackground.right
+                anchors.top: cardBackground.top
                 anchors.margins: Style.marginM
                 spacing: Style.marginS
 

@@ -13,6 +13,7 @@ Scope {
   property string currentText: ""
   property bool waitingForPassword: false
   property bool unlockInProgress: false
+  property bool isUnlocking: false
   property bool showFailure: false
   property bool showInfo: false
   property string errorMessage: ""
@@ -84,6 +85,7 @@ Scope {
     if (currentText !== "") {
       showInfo = false;
       showFailure = false;
+      isUnlocking = false;
       if (!waitingForPassword) {
         pam.abort();
       }
@@ -153,10 +155,12 @@ Scope {
                    Logger.i("LockContext", "PAM completed with result:", result);
                    if (result === PamResult.Success) {
                      Logger.i("LockContext", "Authentication successful");
+                     root.isUnlocking = true;
                      root.unlocked();
                    } else {
                      Logger.i("LockContext", "Authentication failed");
                      root.currentText = "";
+                     root.isUnlocking = false;
                      errorMessage = I18n.tr("authentication.failed");
                      showFailure = true;
                      root.failed();

@@ -662,6 +662,9 @@ Singleton {
     function disable() {
       NetworkService.setWifiEnabled(false);
     }
+    function launchPortal() {
+      NetworkService.launchCaptivePortal();
+    }
   }
 
   IpcHandler {

@@ -309,6 +309,7 @@ Item {
       "clipboardId": item.id,
       "mime": item.mime,
       "preview": item.preview,
+      "badgeIcon": item.isPinned ? "pin" : "",
       "provider": root
     };
   }
@@ -368,6 +369,7 @@ Item {
       "preview": preview,
       "contentType": item.contentType,
       "colorHex": colorHex,
+      "badgeIcon": item.isPinned ? "pin" : "",
       "provider": root
     };
   }
@@ -383,6 +385,15 @@ Item {
       return [];
 
     var actions = [];
+
+    const isPinned = String(item.clipboardId).startsWith("pinned_") || ClipboardService.isPinned(item);
+    actions.push({
+                   "icon": isPinned ? "pin-filled" : "pin",
+                   "tooltip": isPinned ? "Unpin Item" : "Pin Item",
+                   "action": function () {
+                     ClipboardService.togglePin(item);
+                   }
+                 });
 
     // Annotation tool for images
     if (item.isImage && Settings.data.appLauncher.screenshotAnnotationTool !== "") {

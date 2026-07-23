@@ -1,6 +1,39 @@
 {
   "todos": [
     {
+      "id": 1783741462656,
+      "text": "tafsir",
+      "completed": false,
+      "completedAt": "",
+      "createdAt": "2026-07-11T03:44:22.656Z",
+      "pageId": 0,
+      "priority": "medium",
+      "details": "",
+      "daily": true
+    },
+    {
+      "id": 1783741457432,
+      "text": "tech video",
+      "completed": false,
+      "completedAt": "",
+      "createdAt": "2026-07-11T03:44:17.432Z",
+      "pageId": 0,
+      "priority": "low",
+      "details": "",
+      "daily": true
+    },
+    {
+      "id": 1783741452794,
+      "text": "i video",
+      "completed": false,
+      "completedAt": "",
+      "createdAt": "2026-07-11T03:44:12.794Z",
+      "pageId": 0,
+      "priority": "medium",
+      "details": "",
+      "daily": true
+    },
+    {
       "id": 1781355627388,
       "text": "quran",
       "completed": false,
@@ -10,17 +43,6 @@
       "priority": "low",
       "details": "2:64",
       "daily": true
-    },
-    {
-      "id": 1781361151123,
-      "text": "GDSC Mock Interview form fill",
-      "completed": true,
-      "completedAt": "2026-06-19T10:36:25.568Z",
-      "createdAt": "2026-06-13T14:32:31.123Z",
-      "pageId": 0,
-      "priority": "high",
-      "details": "",
-      "daily": false
     }
   ],
   "pages": [
@@ -30,11 +52,11 @@
     }
   ],
   "current_page_id": 0,
-  "count": 2,
+  "count": 4,
   "completedCount": 1,
   "showCompleted": true,
   "showBackground": true,
-  "isExpanded": true,
+  "isExpanded": false,
   "useCustomColors": false,
   "priorityColors": {
     "high": "#f44336",

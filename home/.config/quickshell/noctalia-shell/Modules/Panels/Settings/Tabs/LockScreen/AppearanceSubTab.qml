@@ -93,6 +93,29 @@ ColumnLayout {
     defaultValue: Settings.getDefaultValue("general.lockScreenAnimations")
   }
 
+  NToggle {
+    label: "Enable Login Loading Screen"
+    description: "Display user avatar, name, and loading spinner before transitioning to the desktop"
+    checked: Settings.data.general.enableLoginLoadingScreen
+    onToggled: checked => Settings.data.general.enableLoginLoadingScreen = checked
+    defaultValue: Settings.getDefaultValue("general.enableLoginLoadingScreen")
+  }
+
+  NValueSlider {
+    Layout.fillWidth: true
+    label: "Login Loading Duration"
+    description: "Duration to display loading state to ensure desktop content finishes rendering"
+    from: 500
+    to: 3000
+    stepSize: 100
+    showReset: true
+    value: Settings.data.general.loginLoadingDuration
+    onMoved: value => Settings.data.general.loginLoadingDuration = value
+    text: (Settings.data.general.loginLoadingDuration / 1000).toFixed(1) + "s"
+    visible: Settings.data.general.enableLoginLoadingScreen
+    defaultValue: Settings.getDefaultValue("general.loginLoadingDuration")
+  }
+
   NValueSlider {
     Layout.fillWidth: true
     label: I18n.tr("panels.lock-screen.lock-screen-blur-strength-label")

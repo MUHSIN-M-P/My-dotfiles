@@ -142,6 +142,7 @@ Item {
       property alias toastItem: toastItem
 
       screen: root.screen
+      visible: toastItem.visible && toastItem.opacity > 0
 
       // Parse location setting
       readonly property string location: Settings.data.notifications?.location || "top_right"

@@ -508,6 +508,11 @@ Singleton {
     const imageId = generateImageId(n, image);
     queueImage(image, n.appName || "", n.summary || "", id);
 
+    const rawImage = n.image ? String(n.image) : "";
+    const appIconStr = n.appIcon ? String(n.appIcon) : "";
+    const isIconNameOrUri = !rawImage || rawImage.startsWith("image://icon/") || rawImage === appIconStr || (!rawImage.includes("/") && !rawImage.startsWith("file://") && !rawImage.startsWith("http"));
+    const hasLargeImage = Boolean(n.image) && !isIconNameOrUri;
+
     return {
       "id": id,
       "summary": processNotificationText(n.summary || ""),
@@ -529,7 +534,7 @@ Singleton {
                                                                   "identifier": a.identifier || ""
                                                                 }))),
       "appIcon": getIcon(n.appIcon) || "",
-      "hasLargeImage": n.image ? true : false
+      "hasLargeImage": hasLargeImage
     };
   }
 

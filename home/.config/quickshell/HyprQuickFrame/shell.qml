@@ -19,27 +19,36 @@ FreezeScreen {
         id: settings
         category: "Hyprquickshot"
         property bool saveToDisk: true 
+        property string lastMode: "region"
     }
+
+    function initCapture() {
+        if (activeScreen !== null) return
+        const monitor = Hyprland.focusedMonitor
+        if (!monitor) return
+
+        for (const screen of Quickshell.screens) {
+            if (screen.name === monitor.name) {
+                activeScreen = screen
+
+                const timestamp = Date.now()
+                const path = Quickshell.cachePath(`screenshot-${timestamp}.png`)
+                tempPath = path
+                grimProcess.command = ["grim", "-g", `${screen.x},${screen.y} ${screen.width}x${screen.height}`, path]
+                grimProcess.running = true
+                break
+            }
+        }
+    }
+
+    Component.onCompleted: initCapture()
 
     Connections {
         target: Hyprland
         enabled: activeScreen === null
 
         function onFocusedMonitorChanged() {
-            const monitor = Hyprland.focusedMonitor
-            if(!monitor) return
-
-            for (const screen of Quickshell.screens) {
-                if (screen.name === monitor.name) {
-                    activeScreen = screen
-
-                    const timestamp = Date.now()
-                    const path = Quickshell.cachePath(`screenshot-${timestamp}.png`)
-                    tempPath = path
-                    Quickshell.execDetached(["grim", "-g", `${screen.x},${screen.y} ${screen.width}x${screen.height}`, path])
-                    showTimer.start()
-                }
-            }
+            initCapture()
         }
     }
 
@@ -48,7 +57,7 @@ FreezeScreen {
     property var hyprlandMonitor: Hyprland.focusedMonitor
     property string tempPath
 
-    property string mode: "region"
+    property string mode: settings.lastMode
 
     Shortcut {
         sequence: "Escape"
@@ -58,12 +67,10 @@ FreezeScreen {
         }
     }
  
-    Timer {
-        id: showTimer
-        interval: 50
+    Process {
+        id: grimProcess
         running: false
-        repeat: false
-        onTriggered: root.visible = true
+        onExited: root.visible = true
     }
  
     Process {
@@ -191,6 +198,7 @@ FreezeScreen {
 
 						onClicked: {
 							root.mode = modelData.mode
+							settings.lastMode = modelData.mode
 							if (modelData.mode === "screen") {
 								processScreenshot(0, 0, root.targetScreen.width, root.targetScreen.height)
 							}

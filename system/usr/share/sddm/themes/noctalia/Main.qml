@@ -34,6 +34,7 @@ Item {
     property int    userIndex:    0
     property bool   dropOpen:     false
     property bool   userDropOpen: false
+    property bool   isAuthenticating: false
 
     // ── Noctalia custom palette from colors.json ──────────────────────────────
     readonly property string cSurface:      "#131313"      // Clear deep black
@@ -147,6 +148,25 @@ Item {
             width: 96 * root.scaleRatio; height: 96 * root.scaleRatio; radius: 48 * root.scaleRatio; color: "transparent"
             border.color: root.cPrimary; border.width: 2
 
+            // Pulsing glow ring when authenticating
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -4 * root.scaleRatio
+                radius: width / 2
+                color: "transparent"
+                border.color: root.cPrimary
+                border.width: 2.5 * root.scaleRatio
+                opacity: 0.8
+                visible: root.isAuthenticating
+
+                SequentialAnimation on opacity {
+                    loops: Animation.Infinite
+                    running: root.isAuthenticating
+                    NumberAnimation { to: 0.3; duration: 800; easing.type: Easing.InOutQuad }
+                    NumberAnimation { to: 1.0; duration: 800; easing.type: Easing.InOutQuad }
+                }
+            }
+
             Image {
                 id: avi; anchors.centerIn: parent; width: 86 * root.scaleRatio; height: 86 * root.scaleRatio
                 source: {
@@ -197,11 +217,13 @@ Item {
                     Text {
                         text: "▾"; font.family: montserratFont.name; font.pixelSize: Math.round(18 * root.scaleRatio); color: root.cPrimary
                         anchors.verticalCenter: parent.verticalCenter
+                        visible: !root.isAuthenticating
                     }
                 }
 
                 MouseArea {
                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                    enabled: !root.isAuthenticating
                     onClicked: { root.userDropOpen = !root.userDropOpen; root.dropOpen = false }
                 }
             }
@@ -211,6 +233,8 @@ Item {
                 id: dateLbl
                 font.family: montserratFont.name; font.pixelSize: Math.round(16 * root.scaleRatio); color: root.cOnSurfVar
                 text: Qt.formatDate(new Date(), "dddd, MMMM d")
+                opacity: root.isAuthenticating ? 0.0 : 1.0
+                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                 Timer {
                     interval: 60000; running: true; repeat: true
                     onTriggered: dateLbl.text = Qt.formatDate(new Date(), "dddd, MMMM d")
@@ -221,6 +245,8 @@ Item {
         // ── Analogue Clock (Canvas-based) ──
         Canvas {
             id: analogClock
+            opacity: root.isAuthenticating ? 0.0 : 1.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             anchors.right: parent.right; anchors.rightMargin: 24 * root.scaleRatio
             anchors.verticalCenter: parent.verticalCenter
             width: 100 * root.scaleRatio; height: 100 * root.scaleRatio
@@ -390,6 +416,8 @@ Item {
     // ══════════════════════════════════════════════════════════════════════════
     Rectangle {
         id: statusContainer
+        opacity: root.isAuthenticating ? 0.0 : 1.0
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: btmCard.top; anchors.bottomMargin: 14 * root.scaleRatio
         height: 36 * root.scaleRatio; radius: 18 * root.scaleRatio
@@ -455,8 +483,8 @@ Item {
         anchors.bottom: parent.bottom; anchors.bottomMargin: 100 * root.scaleRatio
         radius: 24 * root.scaleRatio; color: root.cSurface  // Clear deep black
         border.color: root.cOutlineMuted; border.width: 1
-        height: (errMsg.visible ? 180 : 148) * root.scaleRatio
-        Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+        height: root.isAuthenticating ? 80 * root.scaleRatio : (errMsg.visible ? 180 : 148) * root.scaleRatio
+        Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
         // ── Password Input Box (Radius 24 creates a perfect curved end pill) ──
         Rectangle {
@@ -464,8 +492,8 @@ Item {
             anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14 * root.scaleRatio }
             height: 52 * root.scaleRatio; radius: 26 * root.scaleRatio
             color: "#0dffffff"  // Subtle glass fill
-            border.color: pwField.activeFocus ? root.cPrimary : root.cOutline
-            border.width: pwField.activeFocus ? 2 : 1
+            border.color: root.isAuthenticating ? root.cPrimary : (pwField.activeFocus ? root.cPrimary : root.cOutline)
+            border.width: root.isAuthenticating ? 2 : (pwField.activeFocus ? 2 : 1)
             Behavior on border.color { ColorAnimation { duration: 180 } }
 
             SequentialAnimation {
@@ -482,6 +510,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "\ueae2"; font.family: tablerFont.name; font.pixelSize: Math.round(16 * root.scaleRatio)
                 color: pwField.activeFocus ? root.cPrimary : root.cOnSurfVar
+                visible: !root.isAuthenticating
                 Behavior on color { ColorAnimation { duration: 180 } }
             }
 
@@ -502,6 +531,8 @@ Item {
                 background: null
                 font.family: montserratFont.name; font.pixelSize: Math.round(16 * root.scaleRatio)
                 focus: true
+                enabled: !root.isAuthenticating
+                visible: !root.isAuthenticating
                 Keys.onReturnPressed: doLogin()
                 Keys.onEnterPressed:  doLogin()
             }
@@ -512,7 +543,7 @@ Item {
                 spacing: 6 * root.scaleRatio
                 anchors.left: parent.left; anchors.leftMargin: 54 * root.scaleRatio
                 anchors.verticalCenter: parent.verticalCenter
-                visible: pwField.text.length > 0
+                visible: !root.isAuthenticating && pwField.text.length > 0
 
                 Repeater {
                     model: pwField.text.length
@@ -529,13 +560,13 @@ Item {
             Rectangle {
                 width: 2 * root.scaleRatio; height: 22 * root.scaleRatio
                 color: root.cPrimary
-                visible: pwField.activeFocus && pwField.text.length >= 0 && pwField.selectionStart === pwField.selectionEnd
+                visible: !root.isAuthenticating && pwField.activeFocus && pwField.text.length >= 0 && pwField.selectionStart === pwField.selectionEnd
                 anchors.verticalCenter: parent.verticalCenter
                 x: (54 * root.scaleRatio) + (pwField.text.length * 20 * root.scaleRatio) // approx horizontal caret tracking
                 
                 SequentialAnimation on opacity {
                     loops: Animation.Infinite
-                    running: pwField.activeFocus && pwField.text.length >= 0 && pwField.selectionStart === pwField.selectionEnd
+                    running: !root.isAuthenticating && pwField.activeFocus && pwField.text.length >= 0 && pwField.selectionStart === pwField.selectionEnd
                     NumberAnimation { to: 0; duration: 530 }
                     NumberAnimation { to: 1; duration: 530 }
                 }
@@ -549,6 +580,7 @@ Item {
                 color: submitMa.containsMouse ? "#1a9ccaff" : "transparent"
                 border.color: root.cPrimary
                 border.width: 1
+                visible: !root.isAuthenticating
                 Behavior on color { ColorAnimation { duration: 120 } }
                 Text {
                     anchors.centerIn: parent; text: "→"; font.family: montserratFont.name; font.pixelSize: Math.round(16 * root.scaleRatio)
@@ -557,6 +589,49 @@ Item {
                 MouseArea {
                     id: submitMa; anchors.fill: parent; hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor; onClicked: doLogin()
+                }
+            }
+
+            // In-place Loading Bar (replaces password input contents on submission)
+            Row {
+                anchors.centerIn: parent
+                spacing: 12 * root.scaleRatio
+                visible: root.isAuthenticating
+
+                Item {
+                    id: inPlaceSpinner
+                    width: 22 * root.scaleRatio; height: 22 * root.scaleRatio
+                    anchors.verticalCenter: parent.verticalCenter
+                    property real spinAngle: 0
+
+                    NumberAnimation on spinAngle {
+                        from: 0; to: 360; duration: 1000; loops: Animation.Infinite; running: root.isAuthenticating
+                    }
+
+                    Canvas {
+                        anchors.fill: parent
+                        rotation: inPlaceSpinner.spinAngle
+                        onPaint: {
+                            var ctx = getContext("2d")
+                            ctx.clearRect(0, 0, width, height)
+                            var cx = width / 2, cy = height / 2, r = width / 2 - 2 * root.scaleRatio
+                            ctx.beginPath()
+                            ctx.arc(cx, cy, r, 0, 1.4 * Math.PI)
+                            ctx.strokeStyle = root.cPrimary
+                            ctx.lineWidth = 2.5 * root.scaleRatio
+                            ctx.lineCap = "round"
+                            ctx.stroke()
+                        }
+                    }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Welcome, " + root.currentUser + "... Logging in"
+                    font.family: montserratFont.name
+                    font.pixelSize: Math.round(15 * root.scaleRatio)
+                    font.weight: Font.Medium
+                    color: root.cPrimary
                 }
             }
         }
@@ -574,6 +649,9 @@ Item {
             id: ctrlRow
             anchors { bottom: parent.bottom; bottomMargin: 14 * root.scaleRatio; horizontalCenter: parent.horizontalCenter }
             spacing: 10 * root.scaleRatio
+            opacity: root.isAuthenticating ? 0.0 : 1.0
+            visible: opacity > 0.0
+            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
             // Session selector pill
             Rectangle {
@@ -805,9 +883,11 @@ Item {
 
     // ── Login Logic ────────────────────────────────────────────────────────────
     function doLogin() {
+        if (pwField.text.length === 0) return;
         root.dropOpen = false
         root.userDropOpen = false
         errMsg.text = ""
+        root.isAuthenticating = true
         sddm.login(root.currentUser, pwField.text, root.sessionIndex)
     }
 
@@ -815,10 +895,14 @@ Item {
     Connections {
         target: sddm
         function onLoginFailed() {
+            root.isAuthenticating = false
             errMsg.text = "Incorrect password — try again"
             pwField.clear(); shake.start(); pwField.forceActiveFocus()
         }
-        function onLoginSucceeded() { errMsg.text = "" }
+        function onLoginSucceeded() {
+            root.isAuthenticating = true
+            errMsg.text = ""
+        }
     }
 
     // Direct and immediate focusing plus active focus retry sequence

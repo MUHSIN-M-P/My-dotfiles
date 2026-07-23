@@ -503,6 +503,7 @@ SmartPanel {
                               spacing: Style.marginXS
 
                               NText {
+                                id: ethStatusLabel
                                 text: {
                                   if (modelData.connected) {
                                     switch (NetworkService.networkConnectivity) {
@@ -520,7 +521,22 @@ SmartPanel {
                                   return I18n.tr("common.disconnected");
                                 }
                                 pointSize: Style.fontSizeXXS
-                                color: Qt.alpha(ethItem.getContentColors()[1], Style.opacityHeavy)
+                                color: {
+                                  if (modelData.connected && NetworkService.networkConnectivity === "portal") {
+                                    return ethStatusLabelMouseArea.containsMouse ? Color.mSecondary : Color.mError;
+                                  }
+                                  return Qt.alpha(ethItem.getContentColors()[1], Style.opacityHeavy);
+                                }
+                                font.underline: modelData.connected && NetworkService.networkConnectivity === "portal"
+
+                                MouseArea {
+                                  id: ethStatusLabelMouseArea
+                                  anchors.fill: parent
+                                  enabled: modelData.connected && NetworkService.networkConnectivity === "portal"
+                                  hoverEnabled: true
+                                  cursorShape: Qt.PointingHandCursor
+                                  onClicked: NetworkService.launchCaptivePortal()
+                                }
                               }
 
                               // Network speed indicators (visible when connected and speed > 0)
@@ -567,6 +583,16 @@ SmartPanel {
                                 }
                               }
                             }
+                          }
+
+                          NButton {
+                            id: signInButton
+                            visible: modelData.connected && NetworkService.networkConnectivity === "portal"
+                            text: I18n.tr("wifi.panel.sign-in")
+                            fontSize: Style.fontSizeS
+                            backgroundColor: Color.mOnPrimary
+                            textColor: Color.mPrimary
+                            onClicked: NetworkService.launchCaptivePortal()
                           }
 
                           // Info button on the right

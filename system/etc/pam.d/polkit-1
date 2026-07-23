@@ -2,7 +2,7 @@
 # Polkit: fingerprint scanner activates immediately when dialog opens
 # Typing password in the GUI + clicking Authenticate uses pam_unix
 auth       required     pam_env.so
-auth       sufficient   pam_fprintd.so max-tries=1 timeout=60
+auth       sufficient   pam_fprintd.so max-tries=1 timeout=4
 auth       sufficient   pam_unix.so nullok try_first_pass
 auth       required     pam_deny.so
 

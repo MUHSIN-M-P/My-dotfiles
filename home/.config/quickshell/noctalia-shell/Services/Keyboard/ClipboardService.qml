@@ -40,6 +40,116 @@ Singleton {
   // Approximate first-seen timestamps for entries this session (seconds)
   property var firstSeenById: ({})
 
+  readonly property string pinnedFilePath: Settings.configDir + "pinned_clipboard.json"
+  property var pinnedItems: [] // [{id, originalId, preview, mime, isImage, contentType, content}]
+
+  FileView {
+    id: pinnedFileView
+    path: root.pinnedFilePath
+    watchChanges: true
+    printErrors: false
+
+    adapter: JsonAdapter {
+      id: pinnedAdapter
+      property var pinnedItems: []
+    }
+
+    onLoaded: {
+      try {
+        const parsed = JSON.parse(pinnedFileView.text());
+        root.pinnedItems = Array.isArray(parsed.pinnedItems) ? parsed.pinnedItems : [];
+      } catch (e) {
+        root.pinnedItems = [];
+      }
+    }
+
+    onLoadFailed: function (error) {
+      root.pinnedItems = [];
+    }
+  }
+
+  function savePinned() {
+    Quickshell.execDetached(["mkdir", "-p", Settings.configDir]);
+    pinnedAdapter.pinnedItems = root.pinnedItems;
+    pinnedFileView.writeAdapter();
+  }
+
+  // Check if an item is currently pinned
+  function isPinned(item) {
+    if (!item) return false;
+    const itemOriginalId = String(item.clipboardId || item.id);
+    for (let i = 0; i < root.pinnedItems.length; i++) {
+      let p = root.pinnedItems[i];
+      if (p.originalId === itemOriginalId) {
+        return true;
+      }
+      if (!p.isImage && !item.isImage && p.preview === item.preview) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Toggle pinning of an item
+  function togglePin(item) {
+    if (!item) return;
+    const itemOriginalId = String(item.clipboardId || item.id);
+    
+    // Check if already pinned
+    let pinIdx = -1;
+    for (let i = 0; i < root.pinnedItems.length; i++) {
+      let p = root.pinnedItems[i];
+      if (p.originalId === itemOriginalId || (!p.isImage && !item.isImage && p.preview === item.preview)) {
+        pinIdx = i;
+        break;
+      }
+    }
+
+    if (pinIdx !== -1) {
+      // Unpin
+      root.pinnedItems.splice(pinIdx, 1);
+      root.pinnedItems = root.pinnedItems;
+      savePinned();
+      list();
+    } else {
+      // Pin
+      if (item.isImage) {
+        root.decodeToDataUrl(itemOriginalId, item.mime, function(dataUrl) {
+          if (!dataUrl) return;
+          const newPin = {
+            "id": "pinned_" + Date.now(),
+            "originalId": itemOriginalId,
+            "preview": item.preview,
+            "isImage": true,
+            "mime": item.mime,
+            "contentType": item.contentType || "image",
+            "content": dataUrl
+          };
+          root.pinnedItems.push(newPin);
+          root.pinnedItems = root.pinnedItems;
+          savePinned();
+          list();
+        });
+      } else {
+        root.decode(itemOriginalId, function(content) {
+          const newPin = {
+            "id": "pinned_" + Date.now(),
+            "originalId": itemOriginalId,
+            "preview": item.preview,
+            "isImage": false,
+            "mime": item.mime || "text/plain",
+            "contentType": item.contentType || "text",
+            "content": content || item.preview
+          };
+          root.pinnedItems.push(newPin);
+          root.pinnedItems = root.pinnedItems;
+          savePinned();
+          list();
+        });
+      }
+    }
+  }
+
   // Internal: store callback for decode
   property var _decodeCallback: null
   property int _decodeRequestId: 0
@@ -190,7 +300,42 @@ Singleton {
                                        return true;
                                      });
 
-      items = filtered;
+      // Merge pinned items at the top
+      const finalItems = [];
+      root.pinnedItems.forEach(p => {
+        finalItems.push({
+          "id": p.id,
+          "preview": p.preview,
+          "isImage": p.isImage,
+          "mime": p.mime,
+          "contentType": p.contentType,
+          "isPinned": true
+        });
+      });
+
+      filtered.forEach(item => {
+        // Check if item is already pinned (by originalId or content)
+        let alreadyPinned = false;
+        for (let i = 0; i < root.pinnedItems.length; i++) {
+          let p = root.pinnedItems[i];
+          if (p.originalId === String(item.id) || (!p.isImage && !item.isImage && p.preview === item.preview)) {
+            alreadyPinned = true;
+            break;
+          }
+        }
+        if (!alreadyPinned) {
+          finalItems.push({
+            "id": item.id,
+            "preview": item.preview,
+            "isImage": item.isImage,
+            "mime": item.mime,
+            "contentType": item.contentType,
+            "isPinned": false
+          });
+        }
+      });
+
+      items = finalItems;
       loading = false;
 
       // Try to capture current clipboard and associate with newest item
@@ -383,6 +528,11 @@ Singleton {
 
   // Get content for an ID - uses cache first, falls back to cliphist decode
   function getContent(id) {
+    const idStr = String(id);
+    if (idStr.startsWith("pinned_")) {
+      let pin = root.pinnedItems.find(p => p.id === idStr);
+      return pin ? pin.content : null;
+    }
     if (root.contentCache[id]) {
       return root.contentCache[id];
     }
@@ -391,6 +541,13 @@ Singleton {
 
   // Async decode - checks cache first, then falls back to cliphist
   function decode(id, cb) {
+    const idStr = String(id);
+    if (idStr.startsWith("pinned_")) {
+      let pin = root.pinnedItems.find(p => p.id === idStr);
+      if (cb) cb(pin ? pin.content : "");
+      return;
+    }
+
     if (!root.cliphistAvailable) {
       if (cb)
         cb("");
@@ -419,12 +576,18 @@ Singleton {
       if (cb)
         cb(content);
     };
-    const idStr = String(id);
     decodeProc.command = ["cliphist", "decode", idStr];
     decodeProc.running = true;
   }
 
   function decodeToDataUrl(id, mime, cb) {
+    const idStr = String(id);
+    if (idStr.startsWith("pinned_")) {
+      let pin = root.pinnedItems.find(p => p.id === idStr);
+      if (cb) cb(pin ? pin.content : "");
+      return;
+    }
+
     if (!root.cliphistAvailable) {
       if (cb)
         cb("");
@@ -451,6 +614,11 @@ Singleton {
     if (id === undefined) {
       return null;
     }
+    const idStr = String(id);
+    if (idStr.startsWith("pinned_")) {
+      let pin = root.pinnedItems.find(p => p.id === idStr);
+      return pin ? pin.content : null;
+    }
     return root.imageDataById[id];
   }
 
@@ -469,6 +637,23 @@ Singleton {
     if (!root.cliphistAvailable) {
       return;
     }
+    const idStr = String(id);
+    if (idStr.startsWith("pinned_")) {
+      let pin = root.pinnedItems.find(p => p.id === idStr);
+      if (pin) {
+        if (pin.isImage) {
+          const parts = pin.content.split(",");
+          const b64 = parts[1] || "";
+          const typeArg = pin.mime ? ` --type ${pin.mime}` : "";
+          copyProc.command = ["sh", "-c", `echo -n '${b64}' | base64 -d | wl-copy${typeArg}`];
+        } else {
+          const escaped = pin.content.replace(/'/g, "'\\''");
+          copyProc.command = ["sh", "-c", `printf '%s' '${escaped}' | wl-copy`];
+        }
+        copyProc.running = true;
+        return;
+      }
+    }
     copyProc.command = ["sh", "-c", `cliphist decode ${id} | wl-copy`];
     copyProc.running = true;
   }
@@ -477,9 +662,29 @@ Singleton {
     if (!root.cliphistAvailable) {
       return;
     }
+    const idStr = String(id);
     const isImage = mime && mime.startsWith("image/");
     const typeArg = isImage ? ` --type ${mime}` : "";
     const pasteKeys = isImage ? "sleep 0.15 && wtype -M ctrl -k v" : "sleep 0.15 && wtype -M ctrl v";
+
+    if (idStr.startsWith("pinned_")) {
+      let pin = root.pinnedItems.find(p => p.id === idStr);
+      if (pin) {
+        let copyCmd = "";
+        if (pin.isImage) {
+          const parts = pin.content.split(",");
+          const b64 = parts[1] || "";
+          copyCmd = `echo -n '${b64}' | base64 -d | wl-copy${typeArg}`;
+        } else {
+          const escaped = pin.content.replace(/'/g, "'\\''");
+          copyCmd = `printf '%s' '${escaped}' | wl-copy`;
+        }
+        pasteProc.command = ["sh", "-c", `${copyCmd} && ${pasteKeys}`];
+        pasteProc.running = true;
+        return;
+      }
+    }
+
     const cmd = `cliphist decode ${id} | wl-copy${typeArg} && ${pasteKeys}`;
     pasteProc.command = ["sh", "-c", cmd];
     pasteProc.running = true;
@@ -498,10 +703,21 @@ Singleton {
     if (!root.cliphistAvailable) {
       return;
     }
+    const idStr = String(id).trim();
+    if (idStr.startsWith("pinned_")) {
+      let pinIdx = root.pinnedItems.findIndex(p => p.id === idStr);
+      if (pinIdx !== -1) {
+        root.pinnedItems.splice(pinIdx, 1);
+        root.pinnedItems = root.pinnedItems;
+        savePinned();
+        revision++;
+        Qt.callLater(() => list());
+      }
+      return;
+    }
     if (deleteProc.running) {
       return;
     }
-    const idStr = String(id).trim();
     // Remove from caches
     delete root.contentCache[idStr];
     delete root.imageDataById[idStr];
@@ -540,5 +756,52 @@ Singleton {
       "w": Number(match[3]),
       "h": Number(match[4])
     };
+  }
+
+  IpcHandler {
+    target: "clipboard"
+
+    function togglePin(id: string) {
+      const idStr = String(id).trim();
+      if (idStr.startsWith("pinned_")) {
+        let pin = root.pinnedItems.find(p => p.id === idStr);
+        if (pin) {
+          root.togglePin({ "clipboardId": pin.id, "id": pin.id, "isImage": pin.isImage, "mime": pin.mime, "preview": pin.preview });
+        }
+      } else {
+        let item = root.items.find(i => String(i.id) === idStr);
+        if (item) {
+          root.togglePin({ "clipboardId": item.id, "id": item.id, "isImage": item.isImage, "mime": item.mime, "preview": item.preview });
+        }
+      }
+    }
+
+    function pin(id: string) {
+      const idStr = String(id).trim();
+      let item = root.items.find(i => String(i.id) === idStr);
+      if (item && !root.isPinned(item)) {
+        root.togglePin({ "clipboardId": item.id, "id": item.id, "isImage": item.isImage, "mime": item.mime, "preview": item.preview });
+      }
+    }
+
+    function unpin(id: string) {
+      const idStr = String(id).trim();
+      let item = root.items.find(i => String(i.id) === idStr);
+      if (item && root.isPinned(item)) {
+        root.togglePin({ "clipboardId": item.id, "id": item.id, "isImage": item.isImage, "mime": item.mime, "preview": item.preview });
+      }
+    }
+
+    function listPinned(): string {
+      return JSON.stringify(root.pinnedItems.map(p => ({
+        id: p.id,
+        originalId: p.originalId,
+        mime: p.mime,
+        isImage: p.isImage,
+        contentType: p.contentType,
+        preview: p.preview,
+        content: p.contentType === "image" ? "" : p.content
+      })));
+    }
   }
 }

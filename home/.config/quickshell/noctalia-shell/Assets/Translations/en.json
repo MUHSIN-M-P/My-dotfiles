@@ -2218,6 +2218,7 @@
     },
     "panel": {
       "action-required": "Action required",
+      "action-required-desc": "Sign-in required for network",
       "add-hidden-network": "Add hidden network",
       "add-network": "Add network",
       "available-interfaces": "Available interfaces",
@@ -2254,6 +2255,7 @@
       "security-wpa3": "WPA3",
       "security-wpa3-ent": "WPA3 Enterprise",
       "show-password": "Show password",
+      "sign-in": "Sign In",
       "title": "Wi‑Fi"
     },
     "signal": {

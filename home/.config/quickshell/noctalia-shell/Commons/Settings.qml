@@ -315,6 +315,8 @@ Singleton {
       property bool animationDisabled: false
       property bool compactLockScreen: false
       property bool lockScreenAnimations: false
+      property bool enableLoginLoadingScreen: true
+      property int loginLoadingDuration: 1200
       property bool lockOnSuspend: true
       property bool showSessionButtonsOnLockScreen: true
       property bool showHibernateOnLockScreen: false

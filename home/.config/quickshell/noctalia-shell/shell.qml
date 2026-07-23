@@ -11,6 +11,7 @@
 // Qt & Quickshell Core
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
 // Commons & Services
 import qs.Commons
@@ -146,6 +147,30 @@ ShellRoot {
 
       LockScreen {}
       FadeOverlay {}
+
+      // Invisible: signals swaybg login-splash bridge to exit once desktop is ready
+      Item {
+        id: desktopReadySignaler
+        property bool signaled: false
+
+        Process {
+          id: readyProc
+          command: ["bash", "-c", "touch /tmp/noctalia-ready"]
+        }
+
+        Timer {
+          interval: 300
+          running: true
+          repeat: true
+          onTriggered: {
+            if (!parent.signaled && WallpaperService.isInitialized) {
+              parent.signaled = true;
+              readyProc.running = true;
+              stop();
+            }
+          }
+        }
+      }
       BatteryWarningOverlay {}
 
       // Settings window mode (single window across all monitors)

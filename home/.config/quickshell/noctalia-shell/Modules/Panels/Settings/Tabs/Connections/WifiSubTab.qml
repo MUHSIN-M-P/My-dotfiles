@@ -713,6 +713,7 @@ Item {
               }
 
               NText {
+                id: statusLabel
                 text: {
                   if (NetworkService.disconnectingFrom === modelData.ssid) {
                     return I18n.tr("wifi.panel.disconnecting");
@@ -735,7 +736,22 @@ Item {
                   return NetworkService.isSecured(modelData.security) ? modelData.security : I18n.tr("wifi.panel.security-open");
                 }
                 pointSize: Style.fontSizeXXS
-                color: Qt.alpha(networkItem.getContentColors()[1], Style.opacityHeavy)
+                color: {
+                  if (modelData.connected && NetworkService.networkConnectivity === "portal") {
+                    return statusLabelMouseArea.containsMouse ? Color.mSecondary : Color.mError;
+                  }
+                  return Qt.alpha(networkItem.getContentColors()[1], Style.opacityHeavy);
+                }
+                font.underline: modelData.connected && NetworkService.networkConnectivity === "portal"
+
+                MouseArea {
+                  id: statusLabelMouseArea
+                  anchors.fill: parent
+                  enabled: modelData.connected && NetworkService.networkConnectivity === "portal"
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: NetworkService.launchCaptivePortal()
+                }
               }
 
               // Network speed indicators (visible when connected and speed > 0)
@@ -854,6 +870,16 @@ Item {
               backgroundColor: Color.mSurfaceVariant
               textColor: Color.mOnSurface
               onClicked: NetworkService.disconnect(modelData.ssid)
+            }
+
+            NButton {
+              id: signInButton
+              visible: modelData.connected && NetworkService.networkConnectivity === "portal"
+              text: I18n.tr("wifi.panel.sign-in")
+              fontSize: Style.fontSizeS
+              backgroundColor: Color.mOnPrimary
+              textColor: Color.mPrimary
+              onClicked: NetworkService.launchCaptivePortal()
             }
           }
         }

@@ -69,12 +69,23 @@ Loader {
       LockContext {
         id: lockContext
         onUnlocked: {
-          lockSession.locked = false;
-          root.scheduleUnloadAfterUnlock();
-          lockContext.currentText = "";
+          loadingTimer.start();
         }
         onFailed: {
           lockContext.currentText = "";
+          lockContext.isUnlocking = false;
+        }
+      }
+
+      Timer {
+        id: loadingTimer
+        interval: Settings.data.general.enableLoginLoadingScreen ? (Settings.data.general.loginLoadingDuration || 1200) : 0
+        repeat: false
+        onTriggered: {
+          lockSession.locked = false;
+          root.scheduleUnloadAfterUnlock();
+          lockContext.currentText = "";
+          lockContext.isUnlocking = false;
         }
       }
 
@@ -152,6 +163,19 @@ Loader {
                 // Header with avatar, welcome, time, date
                 LockScreenHeader {
                   id: headerComponent
+                  opacity: (lockContext.unlockInProgress || lockContext.isUnlocking) ? 0.0 : 1.0
+
+                  Behavior on opacity {
+                    NumberAnimation {
+                      duration: Style.animationNormal
+                      easing.type: Easing.OutCubic
+                    }
+                  }
+                }
+
+                // Centered Login Loading Card shown during password verification and desktop loading
+                LockScreenLoadingView {
+                  lockContext: lockContext
                 }
 
                 // Info notification
@@ -163,7 +187,7 @@ Loader {
                   anchors.bottomMargin: (Settings.data.general.compactLockScreen ? 280 : 360) * Style.uiScaleRatio
                   radius: Style.radiusL
                   color: Color.mTertiary
-                  visible: lockContext.showInfo && lockContext.infoMessage && !panelComponent.timerActive
+                  visible: lockContext.showInfo && lockContext.infoMessage && !panelComponent.timerActive && !lockContext.unlockInProgress && !lockContext.isUnlocking
                   opacity: visible ? 1.0 : 0.0
 
                   RowLayout {
@@ -202,7 +226,7 @@ Loader {
                   anchors.bottomMargin: (Settings.data.general.compactLockScreen ? 280 : 360) * Style.uiScaleRatio
                   radius: Style.radiusL
                   color: Color.mError
-                  visible: lockContext.showFailure && lockContext.errorMessage && !panelComponent.timerActive
+                  visible: lockContext.showFailure && lockContext.errorMessage && !panelComponent.timerActive && !lockContext.unlockInProgress && !lockContext.isUnlocking
                   opacity: visible ? 1.0 : 0.0
 
                   RowLayout {
@@ -241,7 +265,7 @@ Loader {
                   anchors.bottomMargin: (Settings.data.general.compactLockScreen ? 280 : 360) * Style.uiScaleRatio
                   radius: Style.radiusL
                   color: Color.mSurface
-                  visible: panelComponent.timerActive
+                  visible: panelComponent.timerActive && !lockContext.unlockInProgress && !lockContext.isUnlocking
                   opacity: visible ? 1.0 : 0.0
 
                   RowLayout {
@@ -296,7 +320,7 @@ Loader {
                   width: 0
                   height: 0
                   visible: false
-                  enabled: !lockContext.unlockInProgress
+                  enabled: !lockContext.unlockInProgress && !lockContext.isUnlocking
                   echoMode: TextInput.Password
                   passwordMaskDelay: 0
 
@@ -341,6 +365,14 @@ Loader {
                   batteryIndicator: batteryIndicator
                   keyboardLayout: keyboardLayout
                   passwordInput: passwordInput
+                  opacity: (lockContext.unlockInProgress || lockContext.isUnlocking) ? 0.0 : 1.0
+
+                  Behavior on opacity {
+                    NumberAnimation {
+                      duration: Style.animationNormal
+                      easing.type: Easing.OutCubic
+                    }
+                  }
                 }
               }
             }
