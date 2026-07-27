@@ -144,10 +144,22 @@
     "command": "exec hyprpicker -a"
   },
   {
+    "keys": "Super + Alt + W",
+    "desc": "Wallpaper Grid Panel",
+    "explanation": "Opens the Noctalia wallpaper heaven grid panel to browse and select wallpapers.",
+    "command": "qs -c noctalia-shell ipc call wallpaper toggle"
+  },
+  {
     "keys": "Super + Y",
-    "desc": "Wallpaper Picker",
-    "explanation": "Opens the Wallcards menu to customize system wallpapers.",
-    "command": "exec wallcards"
+    "desc": "Wallcards Stack",
+    "explanation": "Opens the Wallcards lively card stack wallpaper selector with live preview.",
+    "command": "qs -c noctalia-shell ipc call plugin:wallcards toggle"
+  },
+  {
+    "keys": "Super + Alt + Y",
+    "desc": "Fetch 10 Random Wallpapers",
+    "explanation": "Downloads 10 new random wallpapers from Wallhaven directly into your Noctalia gallery.",
+    "command": "fetch-wallpapers 10"
   },
   {
     "keys": "PrintScreen",

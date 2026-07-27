@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# fetch-wallpapers — Fetch N random SFW wallpapers from Wallhaven directly into Noctalia pool.
+
+set -euo pipefail
+
+COUNT="${1:-10}"
+WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
+CACHE_DIR="$HOME/.cache/noctalia"
+SEEN_FILE="$CACHE_DIR/seen_wallpapers.txt"
+
+mkdir -p "$WALLPAPER_DIR" "$CACHE_DIR"
+touch "$SEEN_FILE"
+
+# Detect screen resolution
+read_screen_resolution() {
+    local width height
+    if command -v hyprctl &>/dev/null; then
+        width=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[0].width // empty')
+        height=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[0].height // empty')
+    fi
+
+    if [[ -z "$width" || -z "$height" || "$width" == "null" || "$height" == "null" ]]; then
+        width=1920
+        height=1080
+    fi
+
+    echo "${width}x${height}"
+}
+
+RESOLUTION=$(read_screen_resolution)
+
+STYLE_QUERIES=(
+    "cyberpunk neon city rain night futuristic"
+    "sci fi city lights noir"
+    "futuristic skyline synthwave"
+    "minimal dark abstract geometry"
+    "dark gradient abstract clean"
+    "moody minimal texture"
+    "landscape nature mountains dark"
+    "space galaxy nebula minimalist"
+)
+
+choose_query() {
+    echo "${STYLE_QUERIES[$((RANDOM % ${#STYLE_QUERIES[@]}))]}"
+}
+
+is_link_seen() {
+    grep -qFx "$1" "$SEEN_FILE" 2>/dev/null
+}
+
+record_link_seen() {
+    echo "$1" >> "$SEEN_FILE"
+}
+
+fetch_wallhaven_link() {
+    local attempts=0
+    local page seed query api_url response
+
+    while [[ "$attempts" -lt 8 ]]; do
+        query="$(choose_query)"
+        page=$(( (RANDOM % 8) + 1 ))
+        seed="$(date +%s)$RANDOM"
+
+        api_url="https://wallhaven.cc/api/v1/search?categories=110&purity=100&sorting=random&atleast=${RESOLUTION}&page=${page}&seed=${seed}&q=${query// /+}"
+        response=$(curl -fsSL "$api_url" 2>/dev/null || true)
+        if [[ -n "$response" ]]; then
+            mapfile -t candidates < <(echo "$response" | jq -r '.data[].path // empty' 2>/dev/null)
+            for c in "${candidates[@]}"; do
+                if [[ -n "$c" && "$c" != "null" ]] && ! is_link_seen "$c"; then
+                    record_link_seen "$c"
+                    echo "$c"
+                    return 0
+                fi
+            done
+        fi
+        attempts=$((attempts + 1))
+    done
+
+    # Fallback search without query
+    api_url="https://wallhaven.cc/api/v1/search?categories=110&purity=100&sorting=random&atleast=${RESOLUTION}&page=1"
+    response=$(curl -fsSL "$api_url" 2>/dev/null || true)
+    if [[ -n "$response" ]]; then
+        mapfile -t candidates < <(echo "$response" | jq -r '.data[].path // empty' 2>/dev/null)
+        for c in "${candidates[@]}"; do
+            if [[ -n "$c" && "$c" != "null" ]] && ! is_link_seen "$c"; then
+                record_link_seen "$c"
+                echo "$c"
+                return 0
+            fi
+        done
+    fi
+
+    return 1
+}
+
+notify-send "Wallpaper Gallery" "Downloading $COUNT new random wallpapers..." -a "Wallpaper" -i preferences-desktop-wallpaper || true
+
+downloaded=0
+for ((i=1; i<=COUNT; i++)); do
+    link="$(fetch_wallhaven_link || true)"
+    if [[ -n "$link" ]]; then
+        ext="${link##*.}"
+        [[ -z "$ext" ]] && ext="jpg"
+        ts="$(date +%Y%m%d_%H%M%S)"
+        dest="$WALLPAPER_DIR/wallpaper_${ts}_${RANDOM}.${ext}"
+        if curl -fL "$link" -o "$dest" >/dev/null 2>&1; then
+            downloaded=$((downloaded + 1))
+        fi
+    fi
+done
+
+# Refresh Noctalia wallpaper list
+if command -v qs &>/dev/null; then
+    qs -c noctalia-shell ipc call wallpaper refresh >/dev/null 2>&1 || true
+fi
+
+if [[ "$downloaded" -gt 0 ]]; then
+    notify-send "Wallpaper Gallery" "Added $downloaded new random wallpaper(s) to your gallery!" -a "Wallpaper" -i preferences-desktop-wallpaper || true
+else
+    notify-send "Wallpaper Gallery" "Could not download wallpapers at this time." -a "Wallpaper" || true
+fi

@@ -500,6 +500,9 @@ Singleton {
                                               }));
 
     let image = n.image || getIcon(n.appIcon);
+    if (n.summary === "Wallpaper Downloader") {
+      Logger.d("WallpaperNotif", "summary: " + n.summary + " | body: " + n.body + " | appName: " + n.appName + " | appIcon: " + n.appIcon + " | image: " + n.image);
+    }
     if (image && image.startsWith("image://icon//")) {
       image = image.substring(13);
     } else if (image && image.startsWith("image://icon/file://")) {
@@ -510,7 +513,13 @@ Singleton {
 
     const rawImage = n.image ? String(n.image) : "";
     const appIconStr = n.appIcon ? String(n.appIcon) : "";
-    const isIconNameOrUri = !rawImage || rawImage.startsWith("image://icon/") || rawImage === appIconStr || (!rawImage.includes("/") && !rawImage.startsWith("file://") && !rawImage.startsWith("http"));
+    const resolvedAppIcon = getIcon(n.appIcon) || "";
+
+    const isIconPath = rawImage.includes("/icons/") || rawImage.includes("/pixmaps/") || rawImage.includes("/symbolic/") || rawImage.includes("/app-icons/");
+    const isSymbolic = rawImage.endsWith("-symbolic") || rawImage.endsWith("-symbolic.svg") || rawImage.endsWith(".symbolic.png") || rawImage.endsWith("-symbolic.png");
+    const matchesAppIcon = (rawImage === appIconStr) || (resolvedAppIcon !== "" && rawImage === resolvedAppIcon);
+
+    const isIconNameOrUri = !rawImage || rawImage.startsWith("image://icon/") || matchesAppIcon || isIconPath || isSymbolic || (!rawImage.includes("/") && !rawImage.startsWith("file://") && !rawImage.startsWith("http"));
     const hasLargeImage = Boolean(n.image) && !isIconNameOrUri;
 
     return {

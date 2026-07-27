@@ -346,13 +346,12 @@ Rectangle {
                           let sb = b._score !== undefined ? b._score : 0;
 
                           // Boost scores for frequently used items from tracked providers
-                          // _score is normalized 0–1, so boost is scaled to nudge, not overwhelm
                           if (boostByUsage) {
                             if (a.provider && a.provider.trackUsage && a.usageKey) {
-                              sa += 0.1 * Math.log2(1 + ShellState.getLauncherUsageCount(a.usageKey));
+                              sa += 50 * Math.log2(1 + ShellState.getLauncherUsageCount(a.usageKey));
                             }
                             if (b.provider && b.provider.trackUsage && b.usageKey) {
-                              sb += 0.1 * Math.log2(1 + ShellState.getLauncherUsageCount(b.usageKey));
+                              sb += 50 * Math.log2(1 + ShellState.getLauncherUsageCount(b.usageKey));
                             }
                           }
 

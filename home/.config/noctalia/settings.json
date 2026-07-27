@@ -25,7 +25,7 @@
         "showIconBackground": true,
         "sortByMostUsed": true,
         "terminalCommand": "kitty -e",
-        "viewMode": "list"
+        "viewMode": "grid"
     },
     "audio": {
         "mprisBlacklist": [
@@ -34,7 +34,7 @@
         "preferredPlayer": "MPD",
         "spectrumFrameRate": 60,
         "spectrumMirrored": true,
-        "visualizerType": "mirrored",
+        "visualizerType": "wave",
         "volumeFeedback": false,
         "volumeFeedbackSoundFile": "",
         "volumeOverdrive": false,
@@ -295,7 +295,7 @@
     },
     "colorSchemes": {
         "darkMode": true,
-        "generationMethod": "rainbow",
+        "generationMethod": "content",
         "manualSunrise": "06:30",
         "manualSunset": "18:30",
         "monitorForColors": "eDP-1",
@@ -498,6 +498,7 @@
         "enableBlurBehind": true,
         "enableLockScreenCountdown": true,
         "enableLockScreenMediaControls": false,
+        "enableLoginLoadingScreen": true,
         "enableShadows": true,
         "forceBlackScreenCorners": true,
         "iRadiusRatio": 1,
@@ -533,6 +534,7 @@
         "lockScreenMonitors": [
         ],
         "lockScreenTint": 0,
+        "loginLoadingDuration": 1200,
         "passwordChars": true,
         "radiusRatio": 1,
         "reverseScroll": true,
@@ -860,7 +862,7 @@
         ],
         "useOriginalImages": true,
         "useSolidColor": false,
-        "useWallhaven": false,
+        "useWallhaven": true,
         "viewMode": "single",
         "wallhavenApiKey": "",
         "wallhavenCategories": "111",

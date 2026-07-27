@@ -67,12 +67,8 @@ Item {
   function onOpened() {
     // Just update available categories in case pinned apps changed
     updateAvailableCategories();
-    // Default to Pinned if there are pinned apps, otherwise all
-    if (availableCategories.includes("Pinned")) {
-      selectedCategory = "Pinned";
-    } else {
-      selectedCategory = "all";
-    }
+    // Default to "all" category on launcher open to show all applications sorted by usage
+    selectedCategory = "all";
     // Set category mode initially (will be updated when getResults is called)
     showsCategories = true;
   }
@@ -463,55 +459,70 @@ Item {
     // Use fuzzy search if available, fallback to simple search
     if (typeof FuzzySort !== 'undefined') {
       const fuzzyResults = FuzzySort.go(query, filteredEntries, {
-                                          "keys": ["name", "comment", "genericName", "executableName"],
-                                          "limit": 20
+                                          "keys": ["name", "executableName", "genericName", "comment"],
+                                          "limit": 35
                                         });
 
-      // Sort pinned first within fuzzy results while preserving fuzzysort order otherwise
-      const pinned = [];
-      const nonPinned = [];
-      for (const r of fuzzyResults) {
+      const scoredResults = fuzzyResults.map(r => {
         const app = r.obj;
-        if (isAppPinned(app))
-          pinned.push(r);
-        else
-          nonPinned.push(r);
-      }
-      return pinned.concat(nonPinned).map(result => createResultEntry(result.obj, result.score));
+        const name = (app.name || "").toLowerCase();
+        const exec = getExecutableName(app).toLowerCase();
+        const q = query.toLowerCase().trim();
+
+        let score = (r.score !== undefined ? r.score : -100);
+
+        // Name starts with query (huge priority)
+        if (name.startsWith(q)) {
+          score += 1000;
+        } else if (exec.startsWith(q)) {
+          score += 700;
+        } else if (name.includes(q)) {
+          score += 400;
+        } else if (exec.includes(q)) {
+          score += 200;
+        }
+
+        // Usage count boost
+        const usage = getUsageCount(app);
+        if (usage > 0) {
+          score += Math.min(usage * 10, 500);
+        }
+
+        // Small pinned boost (does not override high relevance matches)
+        if (isAppPinned(app)) {
+          score += 30;
+        }
+
+        return { app: app, score: score };
+      });
+
+      scoredResults.sort((a, b) => b.score - a.score);
+
+      return scoredResults.slice(0, 20).map(item => createResultEntry(item.app, item.score));
     } else {
       // Fallback to simple search
-      const searchTerm = query.toLowerCase();
+      const searchTerm = query.toLowerCase().trim();
       return filteredEntries.filter(app => {
                                       const name = (app.name || "").toLowerCase();
                                       const comment = (app.comment || "").toLowerCase();
                                       const generic = (app.genericName || "").toLowerCase();
                                       const executable = getExecutableName(app).toLowerCase();
                                       return name.includes(searchTerm) || comment.includes(searchTerm) || generic.includes(searchTerm) || executable.includes(searchTerm);
-                                    }).sort((a, b) => {
-                                              // Prioritize name matches, then executable matches
-                                              const aName = a.name.toLowerCase();
-                                              const bName = b.name.toLowerCase();
-                                              const aExecutable = getExecutableName(a).toLowerCase();
-                                              const bExecutable = getExecutableName(b).toLowerCase();
-                                              const aStarts = aName.startsWith(searchTerm);
-                                              const bStarts = bName.startsWith(searchTerm);
-                                              const aExecStarts = aExecutable.startsWith(searchTerm);
-                                              const bExecStarts = bExecutable.startsWith(searchTerm);
+                                    }).map(app => {
+                                              const name = (app.name || "").toLowerCase();
+                                              const exec = getExecutableName(app).toLowerCase();
+                                              let score = 0;
+                                              if (name.startsWith(searchTerm)) score += 1000;
+                                              else if (exec.startsWith(searchTerm)) score += 700;
+                                              else if (name.includes(searchTerm)) score += 400;
+                                              else if (exec.includes(searchTerm)) score += 200;
 
-                                              // Prioritize name matches first
-                                              if (aStarts && !bStarts)
-                                              return -1;
-                                              if (!aStarts && bStarts)
-                                              return 1;
+                                              const usage = getUsageCount(app);
+                                              if (usage > 0) score += Math.min(usage * 10, 500);
+                                              if (isAppPinned(app)) score += 30;
 
-                                              // Then prioritize executable matches
-                                              if (aExecStarts && !bExecStarts)
-                                              return -1;
-                                              if (!aExecStarts && bExecStarts)
-                                              return 1;
-
-                                              return aName.localeCompare(bName);
-                                            }).slice(0, 20).map(app => createResultEntry(app));
+                                              return { app: app, score: score };
+                                            }).sort((a, b) => b.score - a.score).slice(0, 20).map(item => createResultEntry(item.app, item.score));
     }
   }
 

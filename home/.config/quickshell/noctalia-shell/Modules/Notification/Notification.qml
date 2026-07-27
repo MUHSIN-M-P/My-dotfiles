@@ -700,17 +700,34 @@ Variants {
                     // Large Image Preview (Enlarged)
                     NImageRounded {
                       id: largeImagePreview
-                      visible: model.hasLargeImage && (model.cachedImage !== "" || model.originalImage !== "") && largeImagePreview.status === Image.Ready
+                      readonly property real maxImgHeight: Math.round(180 * Style.uiScaleRatio)
+                      readonly property bool isLargeImageReady: model.hasLargeImage
+                        && (model.cachedImage !== "" || model.originalImage !== "")
+                        && largeImagePreview.status === Image.Ready
+                        && largeImagePreview.imageSource !== null
+                        && (largeImagePreview.imageSource.sourceSize.width > 128 || largeImagePreview.imageSource.sourceSize.height > 128)
+
+                      readonly property real calculatedHeight: {
+                        if (!largeImagePreview.imageSource || largeImagePreview.imageSource.sourceSize.width <= 0)
+                          return maxImgHeight;
+                        const srcW = largeImagePreview.imageSource.sourceSize.width;
+                        const srcH = largeImagePreview.imageSource.sourceSize.height;
+                        const availW = Math.max(100, cardBackground.width - Style.margin2M);
+                        const aspectH = (srcH / srcW) * availW;
+                        return Math.min(maxImgHeight, Math.max(40, aspectH));
+                      }
+
+                      visible: isLargeImageReady
                       Layout.fillWidth: true
-                      Layout.preferredHeight: Math.round(180 * Style.uiScaleRatio)
+                      Layout.preferredHeight: isLargeImageReady ? calculatedHeight : 0
                       radius: Style.radiusM
                       imagePath: model.cachedImage || model.originalImage || ""
                       imageFillMode: Image.PreserveAspectFit
                       borderColor: Qt.alpha(Color.mOutline, 0.2)
                       borderWidth: 1
                       fallbackIcon: ""
-                      Layout.topMargin: Style.marginS
-                      Layout.bottomMargin: Style.marginS
+                      Layout.topMargin: isLargeImageReady ? Style.marginS : 0
+                      Layout.bottomMargin: isLargeImageReady ? Style.marginS : 0
                     }
 
                     // Actions
