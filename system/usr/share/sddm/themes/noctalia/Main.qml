@@ -30,7 +30,7 @@ Item {
 
     // ── State ──────────────────────────────────────────────────────────────────
     property int    sessionIndex: 0
-    property string currentUser:  userModel.lastUser
+    property string currentUser:  (typeof userModel !== "undefined" && userModel && userModel.lastUser) ? userModel.lastUser : ""
     property int    userIndex:    0
     property bool   dropOpen:     false
     property bool   userDropOpen: false
@@ -117,7 +117,7 @@ Item {
         source: config.background !== "" ? config.background : ""
         fillMode: Image.PreserveAspectCrop; smooth: true; visible: false
     }
-    GaussianBlur { anchors.fill: parent; source: bgImg; radius: 40; samples: 81 }
+    GaussianBlur { anchors.fill: parent; source: bgImg; radius: 30; samples: 25 }
     Rectangle    { anchors.fill: parent; color: "#72000000" }
     Rectangle {
         anchors.fill: parent
@@ -335,7 +335,7 @@ Item {
         layer.enabled: true
         layer.effect: DropShadow {
             horizontalOffset: 0; verticalOffset: 6 * root.scaleRatio
-            radius: 24 * root.scaleRatio; samples: 49; color: "#99000000"
+            radius: 24 * root.scaleRatio; samples: 25; color: "#99000000"
         }
 
         Column {
@@ -716,7 +716,7 @@ Item {
                 }
                 MouseArea {
                     id: logoutMa; anchors.fill: parent; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor; onClicked: sddm.logout()
+                    cursorShape: Qt.PointingHandCursor; onClicked: if (typeof sddm !== "undefined" && sddm) sddm.logout()
                 }
             }
 
@@ -744,7 +744,7 @@ Item {
                 }
                 MouseArea {
                     id: suspMa; anchors.fill: parent; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor; onClicked: sddm.suspend()
+                    cursorShape: Qt.PointingHandCursor; onClicked: if (typeof sddm !== "undefined" && sddm) sddm.suspend()
                 }
             }
 
@@ -772,7 +772,7 @@ Item {
                 }
                 MouseArea {
                     id: rebtMa; anchors.fill: parent; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor; onClicked: sddm.reboot()
+                    cursorShape: Qt.PointingHandCursor; onClicked: if (typeof sddm !== "undefined" && sddm) sddm.reboot()
                 }
             }
 
@@ -802,7 +802,7 @@ Item {
                 }
                 MouseArea {
                     id: shutMa; anchors.fill: parent; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor; onClicked: sddm.powerOff()
+                    cursorShape: Qt.PointingHandCursor; onClicked: if (typeof sddm !== "undefined" && sddm) sddm.powerOff()
                 }
             }
         }
@@ -824,7 +824,7 @@ Item {
         layer.enabled: true
         layer.effect: DropShadow {
             horizontalOffset: 0; verticalOffset: -6 * root.scaleRatio
-            radius: 24 * root.scaleRatio; samples: 49; color: "#99000000"
+            radius: 24 * root.scaleRatio; samples: 25; color: "#99000000"
         }
 
         Column {

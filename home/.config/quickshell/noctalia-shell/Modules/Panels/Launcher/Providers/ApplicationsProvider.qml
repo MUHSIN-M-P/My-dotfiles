@@ -428,30 +428,31 @@ Item {
     }
 
     if (!query || query.trim() === "") {
-      // Return filtered apps, optionally sorted by usage
+      // Return filtered apps sorted by last used (top 4 for row 1) then alphabetical below
       let sorted;
       if (Settings.data.appLauncher.sortByMostUsed) {
-        sorted = filteredEntries.slice().sort((a, b) => {
-                                                // Pinned first
-                                                const aPinned = isAppPinned(a);
-                                                const bPinned = isAppPinned(b);
-                                                if (aPinned !== bPinned)
-                                                return aPinned ? -1 : 1;
+        // Apps with a recorded last used timestamp, sorted most-recent first
+        const recentApps = filteredEntries.slice()
+          .filter(app => ShellState.getLauncherLastUsed(getAppKey(app)) > 0)
+          .sort((a, b) => ShellState.getLauncherLastUsed(getAppKey(b)) - ShellState.getLauncherLastUsed(getAppKey(a)));
 
-                                                const ua = getUsageCount(a);
-                                                const ub = getUsageCount(b);
-                                                if (ub !== ua)
-                                                return ub - ua;
-                                                return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
-                                              });
+        // Take top 4 for row 1
+        const top4 = recentApps.slice(0, 4);
+        const top4Keys = new Set(top4.map(app => getAppKey(app)));
+
+        // Remaining apps sorted in alphabetical order (A-Z)
+        const remaining = filteredEntries.filter(app => !top4Keys.has(getAppKey(app)))
+          .sort((a, b) => (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase()));
+
+        sorted = top4.concat(remaining);
       } else {
         sorted = filteredEntries.slice().sort((a, b) => {
-                                                const aPinned = isAppPinned(a);
-                                                const bPinned = isAppPinned(b);
-                                                if (aPinned !== bPinned)
-                                                return aPinned ? -1 : 1;
-                                                return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
-                                              });
+          const aPinned = isAppPinned(a);
+          const bPinned = isAppPinned(b);
+          if (aPinned !== bPinned)
+            return aPinned ? -1 : 1;
+          return (a.name || "").toLowerCase().localeCompare((b.name || "").toLowerCase());
+        });
       }
       return sorted.map(app => createResultEntry(app));
     }
@@ -637,11 +638,21 @@ Item {
   // -------------------------
   // Usage tracking helpers
   function getAppKey(app) {
-    if (app && app.id)
-      return String(app.id);
-    if (app && app.command && app.command.join)
-      return app.command.join(" ");
-    return String(app && app.name ? app.name : "unknown");
+    if (!app)
+      return "unknown";
+    let key = "";
+    if (app.id) {
+      key = String(app.id);
+    } else if (app.command && app.command.join) {
+      key = app.command.join(" ");
+    } else if (app.name) {
+      key = String(app.name);
+    }
+    key = key.toLowerCase().trim();
+    if (key.endsWith(".desktop")) {
+      key = key.substring(0, key.length - 8);
+    }
+    return key;
   }
 
   function getUsageCount(app) {

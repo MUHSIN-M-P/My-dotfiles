@@ -36,8 +36,8 @@
     {
       "id": 1781355627388,
       "text": "quran",
-      "completed": false,
-      "completedAt": "",
+      "completed": true,
+      "completedAt": "2026-07-31T04:06:16.173Z",
       "createdAt": "2026-06-13T13:00:27.388Z",
       "pageId": 0,
       "priority": "low",

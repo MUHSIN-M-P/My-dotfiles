@@ -12,6 +12,66 @@ Singleton {
     property string colorSource: Common.Config.options.appearance.colorSource
     property string caelestiaAccentProfile: Common.Config.options.appearance.caelestia.accentProfile
     property string lastCaelestiaPayload: ""
+
+    // Live Noctalia System Theme Bindings from ~/.config/noctalia/colors.json & settings.json
+    property color noctaliaPrimary: "#e1c643"
+    property color noctaliaOnPrimary: "#393000"
+    property color noctaliaSecondary: "#d6c68b"
+    property color noctaliaOnSecondary: "#393003"
+    property color noctaliaSurface: "#15130b"
+    property color noctaliaOnSurface: "#e9e2d3"
+    property color noctaliaSurfaceVariant: "#222017"
+    property color noctaliaOnSurfaceVariant: "#cec6af"
+    property color noctaliaOutline: "#4b4735"
+
+    property string noctaliaFontDefault: "Montserrat"
+    property string noctaliaFontFixed: "JetBrainsMono Nerd Font"
+
+    FileView {
+        id: noctaliaColorsFile
+        path: Quickshell.env("HOME") + "/.config/noctalia/colors.json"
+        watchChanges: true
+        onLoaded: root.parseNoctaliaColors()
+        onFileChanged: root.parseNoctaliaColors()
+        onTextChanged: root.parseNoctaliaColors()
+    }
+
+    FileView {
+        id: noctaliaSettingsFile
+        path: Quickshell.env("HOME") + "/.config/noctalia/settings.json"
+        watchChanges: true
+        onLoaded: root.parseNoctaliaSettings()
+        onFileChanged: root.parseNoctaliaSettings()
+        onTextChanged: root.parseNoctaliaSettings()
+    }
+
+    function parseNoctaliaColors() {
+        if (!noctaliaColorsFile.text) return;
+        try {
+            const data = JSON.parse(noctaliaColorsFile.text);
+            if (data.mPrimary) root.noctaliaPrimary = data.mPrimary;
+            if (data.mOnPrimary) root.noctaliaOnPrimary = data.mOnPrimary;
+            if (data.mSecondary) root.noctaliaSecondary = data.mSecondary;
+            if (data.mOnSecondary) root.noctaliaOnSecondary = data.mOnSecondary;
+            if (data.mSurface) root.noctaliaSurface = data.mSurface;
+            if (data.mOnSurface) root.noctaliaOnSurface = data.mOnSurface;
+            if (data.mSurfaceVariant) root.noctaliaSurfaceVariant = data.mSurfaceVariant;
+            if (data.mOnSurfaceVariant) root.noctaliaOnSurfaceVariant = data.mOnSurfaceVariant;
+            if (data.mOutline) root.noctaliaOutline = data.mOutline;
+        } catch (e) {
+            console.log("Error parsing noctalia colors: " + e);
+        }
+    }
+
+    function parseNoctaliaSettings() {
+        if (!noctaliaSettingsFile.text) return;
+        try {
+            const data = JSON.parse(noctaliaSettingsFile.text);
+            if (data.ui && data.ui.fontDefault) root.noctaliaFontDefault = data.ui.fontDefault;
+        } catch (e) {
+            console.log("Error parsing noctalia settings: " + e);
+        }
+    }
     property QtObject m3colors: {
         if (colorSource === "matugen" && matugenLoader.item)
             return matugenLoader.item;
@@ -246,33 +306,35 @@ Singleton {
     }
 
     Component.onCompleted: {
+        parseNoctaliaColors();
+        parseNoctaliaSettings();
         if (colorSource === "caelestia")
             loadCaelestiaPalette();
     }
 
     colors: QtObject {
-        property color colSubtext: m3colors.m3outline
-        property color colLayer0: m3colors.m3background
-        property color colOnLayer0: m3colors.m3onBackground
-        property color colLayer0Border: ColorUtils.mix(root.m3colors.m3outlineVariant, colLayer0, 0.4)
-        property color colLayer1: m3colors.m3surfaceContainerLow
-        property color colOnLayer1: m3colors.m3onSurfaceVariant
+        property color colSubtext: root.noctaliaOutline
+        property color colLayer0: root.noctaliaSurface
+        property color colOnLayer0: root.noctaliaOnSurface
+        property color colLayer0Border: root.noctaliaOutline
+        property color colLayer1: root.noctaliaSurfaceVariant
+        property color colOnLayer1: root.noctaliaOnSurfaceVariant
         property color colOnLayer1Inactive: ColorUtils.mix(colOnLayer1, colLayer1, 0.45)
         property color colLayer1Hover: ColorUtils.mix(colLayer1, colOnLayer1, 0.92)
         property color colLayer1Active: ColorUtils.mix(colLayer1, colOnLayer1, 0.85)
-        property color colLayer2: m3colors.m3surfaceContainer
-        property color colOnLayer2: m3colors.m3onSurface
+        property color colLayer2: root.noctaliaSurfaceVariant
+        property color colOnLayer2: root.noctaliaOnSurface
         property color colLayer2Hover: ColorUtils.mix(colLayer2, colOnLayer2, 0.90)
         property color colLayer2Active: ColorUtils.mix(colLayer2, colOnLayer2, 0.80)
-        property color colPrimary: m3colors.m3primary
-        property color colOnPrimary: m3colors.m3onPrimary
-        property color colSecondary: m3colors.m3secondary
-        property color colSecondaryContainer: m3colors.m3secondaryContainer
-        property color colOnSecondaryContainer: m3colors.m3onSecondaryContainer
+        property color colPrimary: root.noctaliaPrimary
+        property color colOnPrimary: root.noctaliaOnPrimary
+        property color colSecondary: root.noctaliaSecondary
+        property color colSecondaryContainer: root.noctaliaSurfaceVariant
+        property color colOnSecondaryContainer: root.noctaliaOnSurfaceVariant
         property color colTooltip: m3colors.m3inverseSurface
         property color colOnTooltip: m3colors.m3inverseOnSurface
         property color colShadow: ColorUtils.transparentize(m3colors.m3shadow, 0.7)
-        property color colOutline: m3colors.m3outline
+        property color colOutline: root.noctaliaOutline
     }
 
     rounding: QtObject {
@@ -288,9 +350,10 @@ Singleton {
 
     font: QtObject {
         property QtObject family: QtObject {
-            property string main: Common.Config.options.appearance.font.family.main
-            property string title: Common.Config.options.appearance.font.family.title
-            property string expressive: Common.Config.options.appearance.font.family.expressive
+            property string main: root.noctaliaFontDefault
+            property string title: root.noctaliaFontDefault
+            property string expressive: root.noctaliaFontDefault
+            property string mono: root.noctaliaFontFixed
         }
         property QtObject pixelSize: QtObject {
             property int smaller: Common.Config.options.appearance.font.pixelSize.smaller

@@ -301,14 +301,7 @@ def main():
     config_binds.extend(parse_keybinds_file(KEYBINDS_CONF))
     config_binds.extend(parse_keybinds_file(USER_OVERRIDES_CONF))
 
-    # Remove duplicates from config_binds
-    seen = set()
-    unique_config_binds = []
-    for b in config_binds:
-        key = (b["keys"], b["command"])
-        if key not in seen:
-            seen.add(key)
-            unique_config_binds.append(b)
+    seen_keys = set()
 
     # Load manual binds
     manual_binds = []
@@ -337,37 +330,60 @@ def main():
         except Exception as e:
             pass
 
-    # Tag binds and commands to distinguish them in QML
-    for b in unique_config_binds:
-        b["is_cmd"] = False
+    # Process in priority order: manual > user > config > terminal to eliminate duplicate key combinations
+    final_manual = []
     for b in manual_binds:
         b["is_cmd"] = False
+        k = b.get("keys", "").strip()
+        if k and k not in seen_keys:
+            seen_keys.add(k)
+            final_manual.append(b)
+
+    final_user = []
     for b in user_binds:
         b["is_cmd"] = False
+        k = b.get("keys", "").strip()
+        if k and k not in seen_keys:
+            seen_keys.add(k)
+            final_user.append(b)
+
+    final_config = []
+    for b in config_binds:
+        b["is_cmd"] = False
+        k = b.get("keys", "").strip()
+        if k and k not in seen_keys:
+            seen_keys.add(k)
+            final_config.append(b)
+
+    final_terminal = []
     for b in terminal_commands:
         b["is_cmd"] = True
+        k = b.get("keys", b.get("command", "")).strip()
+        if k and k not in seen_keys:
+            seen_keys.add(k)
+            final_terminal.append(b)
 
     # Group into sections
     output = []
-    if unique_config_binds:
-        output.append({
-            "section": "Active Config Binds",
-            "binds": unique_config_binds
-        })
-    if manual_binds:
+    if final_manual:
         output.append({
             "section": "User Manual Binds",
-            "binds": manual_binds
+            "binds": final_manual
         })
-    if user_binds:
+    if final_user:
         output.append({
             "section": "Custom Commands",
-            "binds": user_binds
+            "binds": final_user
         })
-    if terminal_commands:
+    if final_config:
+        output.append({
+            "section": "Active Config Binds",
+            "binds": final_config
+        })
+    if final_terminal:
         output.append({
             "section": "Terminal Commands",
-            "binds": terminal_commands
+            "binds": final_terminal
         })
 
     print(json.dumps(output, indent=2))

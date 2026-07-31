@@ -2,12 +2,22 @@
 import sys
 import os
 import json
+import re
 import subprocess
 import argparse
 from datetime import datetime, timedelta
 
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    from rich import box
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+
 def check_dependencies():
-    """Check if vnstat and tuptime are installed and in PATH."""
     missing = []
     for cmd in ["vnstat", "tuptime"]:
         if not shutil_which(cmd):
@@ -15,7 +25,6 @@ def check_dependencies():
     return missing
 
 def shutil_which(cmd):
-    """Fallback which function since shutil might not be imported or we want absolute control."""
     for path in os.environ.get("PATH", "").split(os.pathsep):
         full_path = os.path.join(path, cmd)
         if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
@@ -23,7 +32,6 @@ def shutil_which(cmd):
     return None
 
 def format_bytes(bytes_num):
-    """Format bytes into human readable binary suffixes (GiB, MiB, etc.)."""
     for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB']:
         if bytes_num < 1024.0:
             return f"{bytes_num:.2f} {unit}"
@@ -31,7 +39,6 @@ def format_bytes(bytes_num):
     return f"{bytes_num:.2f} PiB"
 
 def get_default_interface():
-    """Detect default network interface using ip route."""
     try:
         res = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, check=True)
         lines = res.stdout.strip().split('\n')
@@ -46,7 +53,6 @@ def get_default_interface():
     return None
 
 def get_vnstat_interfaces():
-    """Get list of interfaces currently tracked by vnstat."""
     try:
         res = subprocess.run(["vnstat", "--json"], capture_output=True, text=True)
         if res.returncode == 0:
@@ -56,139 +62,109 @@ def get_vnstat_interfaces():
         pass
     return []
 
-def parse_relative_date(date_str):
-    """Parse relative dates like '7d', '30d' or absolute date 'YYYY-MM-DD'."""
-    today = datetime.now().date()
-    if date_str.lower() == "today":
-        return today
-    if date_str.lower() == "yesterday":
-        return today - timedelta(days=1)
-    
-    # Check for relative formats like '7d', '14d', '30d'
-    if date_str.endswith('d') and date_str[:-1].isdigit():
-        days = int(date_str[:-1])
-        return today - timedelta(days=days)
-    if date_str.endswith('w') and date_str[:-1].isdigit():
-        weeks = int(date_str[:-1])
-        return today - timedelta(weeks=weeks)
-    if date_str.endswith('m') and date_str[:-1].isdigit():
-        months = int(date_str[:-1])
-        return today - timedelta(days=months * 30) # approximation
-        
-    # Attempt absolute date formats
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
-        try:
-            return datetime.strptime(date_str, fmt).date()
-        except ValueError:
-            continue
-            
-    raise ValueError(f"Could not parse date format: '{date_str}'. Use YYYY-MM-DD or relative format like '7d', '30d'.")
-
-def run_vnstat(interface, start_date, end_date):
-    """Run vnstat and get statistics for the specified range."""
-    # Convert dates to strings
-    start_str = start_date.strftime("%Y-%m-%d")
-    end_str = end_date.strftime("%Y-%m-%d")
-    
-    # We query daily data in JSON format
-    cmd = ["vnstat", "--json", "d", "-i", interface]
+def get_vnstat_totals(interface):
+    """Extract Total Usage for Today, This Month, and Highest Ever Daily."""
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        res = subprocess.run(["vnstat", "--json", "-i", interface], capture_output=True, text=True, check=True)
         data = json.loads(res.stdout)
-        
         interfaces_data = data.get("interfaces", [])
         if not interfaces_data:
             return None
-            
+        
         iface_data = interfaces_data[0]
         traffic = iface_data.get("traffic", {})
         
-        # vnstat json schemas can use 'day' or 'days' depending on version
+        today = datetime.now().date()
+        current_year = today.year
+        current_month = today.month
+        
+        today_total = 0
         days_list = traffic.get("day", []) or traffic.get("days", [])
-        
-        rx_total = 0
-        tx_total = 0
-        days_counted = 0
-        
-        for day_entry in days_list:
-            d_info = day_entry.get("date", {})
-            if not d_info:
-                continue
+        for d in days_list:
+            d_info = d.get("date", {})
+            if d_info.get("year") == current_year and d_info.get("month") == current_month and d_info.get("day") == today.day:
+                today_total = d.get("rx", 0) + d.get("tx", 0)
+                break
+                
+        month_total = 0
+        months_list = traffic.get("month", []) or traffic.get("months", [])
+        for m in months_list:
+            m_info = m.get("date", {})
+            if m_info.get("year") == current_year and m_info.get("month") == current_month:
+                month_total = m.get("rx", 0) + m.get("tx", 0)
+                break
+                
+        highest_total = 0
+        top_list = traffic.get("top", [])
+        if top_list:
+            top_item = max(top_list, key=lambda x: (x.get("rx", 0) + x.get("tx", 0)))
+            highest_total = top_item.get("rx", 0) + top_item.get("tx", 0)
             
-            try:
-                entry_date = datetime(year=d_info["year"], month=d_info["month"], day=d_info["day"]).date()
-            except (KeyError, ValueError):
-                continue
-                
-            if start_date <= entry_date <= end_date:
-                rx_total += day_entry.get("rx", 0)
-                tx_total += day_entry.get("tx", 0)
-                days_counted += 1
-                
         return {
-            "rx": rx_total,
-            "tx": tx_total,
-            "total": rx_total + tx_total,
-            "days_counted": days_counted
+            "today": today_total,
+            "month": month_total,
+            "highest": highest_total
         }
     except Exception as e:
         return f"Error running vnstat: {e}"
 
-def run_tuptime(start_date, end_date):
-    """Run tuptime and get uptime reports since the start date until the end date."""
-    # Convert dates to epoch timestamps
-    # Start of start day
-    start_dt = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0)
-    # End of end day
-    end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59)
-    
-    since_epoch = int(start_dt.timestamp())
-    until_epoch = int(end_dt.timestamp())
-    
-    cmd = ["tuptime", "--tsince", str(since_epoch), "--tuntil", str(until_epoch)]
-    
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            # Check if it failed due to permission/sudo issue
-            if "Permission denied" in res.stderr or "sqlite3" in res.stderr.lower():
-                return "Permission Denied: Running tuptime requires read access to /var/lib/tuptime/tuptime.db.\nPlease run this script with 'sudo' or add your user to the appropriate group."
-            return f"Error running tuptime: {res.stderr.strip()}"
-        return res.stdout.strip()
-    except Exception as e:
-        return f"Error running tuptime: {e}"
-
-def parse_tuptime_stats(output_str):
-    stats = {}
+def parse_tuptime_regex(output_str):
+    parsed = {}
     for line in output_str.split('\n'):
-        line_stripped = line.strip()
-        if not line_stripped:
+        line = line.strip()
+        if not line:
             continue
-        line_lower = line_stripped.lower()
-        if line_lower.startswith("system startups:"):
-            stats["startups"] = line_stripped
-        elif line_lower.startswith("system shutdowns:"):
-            stats["shutdowns"] = line_stripped
-        elif line_lower.startswith("system life:"):
-            stats["life"] = line_stripped
-        elif line_lower.startswith("longest uptime:"):
-            stats["longest"] = line_stripped
-        elif line_lower.startswith("average uptime:"):
-            stats["average"] = line_stripped
-        elif line_lower.startswith("system uptime:"):
-            stats["system_uptime"] = line_stripped
-            parts = line_stripped.split()
-            if len(parts) > 2:
-                try:
-                    stats["system_uptime_pct"] = float(parts[2].rstrip('%'))
-                except ValueError:
-                    pass
-        elif line_lower.startswith("current uptime:"):
-            stats["current"] = line_stripped
-    return stats
+            
+        m_longest = re.match(r"Longest uptime:\s+(.*?)\s+from\s+(.*)", line, re.IGNORECASE)
+        if m_longest:
+            parsed["longest_duration"] = m_longest.group(1).strip()
+            parsed["longest_date"] = m_longest.group(2).strip()
+            continue
+
+        m_current = re.match(r"Current uptime:\s+(.*?)\s+since\s+(.*)", line, re.IGNORECASE)
+        if m_current:
+            parsed["current_duration"] = m_current.group(1).strip()
+            parsed["current_date"] = m_current.group(2).strip()
+            continue
+
+        m_startups = re.match(r"System startups:\s+(\d+)\s+since\s+(.*)", line, re.IGNORECASE)
+        if m_startups:
+            parsed["startups_count"] = m_startups.group(1).strip()
+            parsed["startups_since"] = m_startups.group(2).strip()
+            continue
+
+        m_shutdowns = re.match(r"System shutdowns:\s+(.*)", line, re.IGNORECASE)
+        if m_shutdowns:
+            parsed["shutdowns"] = m_shutdowns.group(1).strip()
+            continue
+
+        m_avg = re.match(r"Average uptime:\s+(.*)", line, re.IGNORECASE)
+        if m_avg:
+            parsed["average"] = m_avg.group(1).strip()
+            continue
+
+        m_uptime = re.match(r"System uptime:\s+([\d\.]+%\s+=\s+.*)", line, re.IGNORECASE)
+        if m_uptime:
+            parsed["system_uptime"] = m_uptime.group(1).strip()
+            pct_match = re.search(r"([\d\.]+)%", line)
+            if pct_match:
+                parsed["system_uptime_pct"] = float(pct_match.group(1))
+            continue
+            
+    return parsed
+
+def format_short_dt(dt_str):
+    try:
+        dt = datetime.strptime(dt_str, "%m/%d/%Y %I:%M:%S %p")
+        today = datetime.now().date()
+        if dt.date() == today:
+            return dt.strftime("%I:%M %p")
+        else:
+            return dt.strftime("%b %d")
+    except Exception:
+        return dt_str
 
 def get_system_intervals(since_epoch, until_epoch):
-    """Run tuptime -l -s and return a list of active system intervals (start, end)."""
     cmd = ["tuptime", "--tsince", str(since_epoch), "--tuntil", str(until_epoch), "-l", "-s"]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True)
@@ -224,10 +200,6 @@ def get_system_intervals(since_epoch, until_epoch):
         return []
 
 def get_lock_intervals(since_epoch, until_epoch, system_intervals):
-    """
-    Read the lock log and calculate total locked seconds within the specified epoch range,
-    restricted to when the system was actually running (system_intervals).
-    """
     log_path = "/home/ldzbeta/.local/state/sys-stats-lock.log"
     if not os.path.exists(log_path):
         return 0
@@ -281,80 +253,176 @@ def get_lock_intervals(since_epoch, until_epoch, system_intervals):
                 
     return total_locked_seconds
 
-def format_duration(seconds):
-    """Format seconds into Xd Xh Xm Xs matching tuptime's padding behavior."""
-    if seconds < 0:
-        seconds = 0
-    d = seconds // (24 * 3600)
-    seconds %= (24 * 3600)
-    h = seconds // 3600
-    seconds %= 3600
-    m = seconds // 60
-    s = seconds % 60
-    
-    parts = []
-    if d > 0:
-        parts.append(f"{d}d")
-        parts.append(f"{h:02d}h")
-        parts.append(f"{m:02d}m")
-        parts.append(f"{s:02d}s")
-    elif h > 0:
-        parts.append(f"{h}h")
-        parts.append(f"{m:02d}m")
-        parts.append(f"{s:02d}s")
-    elif m > 0:
-        parts.append(f"{m}m")
-        parts.append(f"{s:02d}s")
+def make_compact_bar(val, max_val, max_len=8, color="bright_green"):
+    if max_val <= 0:
+        pct = 0.0
     else:
-        parts.append(f"{s}s")
-    return " ".join(parts)
+        pct = min(1.0, max(0.0, val / max_val))
+    filled = int(round(pct * max_len))
+    bar = "█" * filled + "░" * (max_len - filled)
+    return f"[{color}]{bar}[/{color}] {pct*100:4.1f}%"
+
+def get_weekly_usage():
+    today = datetime.now().date()
+    weekly_entries = []
+    
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        s_dt = datetime(day.year, day.month, day.day, 0, 0, 0)
+        e_dt = datetime(day.year, day.month, day.day, 23, 59, 59)
+        s_epoch = int(s_dt.timestamp())
+        e_epoch = int(e_dt.timestamp())
+        
+        intervals = get_system_intervals(s_epoch, e_epoch)
+        total_up = sum(e - s for s, e in intervals)
+        locked_sec = get_lock_intervals(s_epoch, e_epoch, intervals)
+        active_sec = max(0, total_up - locked_sec)
+        
+        weekly_entries.append({
+            "date": day,
+            "total_up": total_up,
+            "active_sec": active_sec,
+            "locked_sec": locked_sec
+        })
+        
+    return weekly_entries
+
+def render_btop_ui(interface, net_stats, tuptime_lifetime, tuptime_period, weekly_entries):
+    console = Console()
+    
+    # 1. Header
+    header_text = Text()
+    header_text.append(" 󰌢 ", style="bold bright_green")
+    header_text.append("SYSTEM USAGE & NETWORK DASHBOARD", style="bold white")
+    header_text.append(f"  │  {interface}", style="dim white")
+    header_text.append(f"  │  {datetime.now().strftime('%b %d, %I:%M %p')}", style="dim white")
+
+    console.print(Panel(header_text, box=box.ROUNDED, border_style="bright_green", padding=(0, 1)))
+
+    # 2. Network Table (ONLY Total Usage - 2 Columns)
+    net_table = Table(box=box.ROUNDED, show_header=True, header_style="bold bright_cyan", border_style="cyan", expand=True)
+    net_table.add_column("Network Period", style="bold white")
+    net_table.add_column("Total Traffic", style="bold green", justify="right")
+
+    if isinstance(net_stats, dict):
+        net_table.add_row("󰅐 Today's Usage", f"[bold yellow]{format_bytes(net_stats['today'])}[/bold yellow]")
+        net_table.add_row("󰸗 This Month's Usage", f"[bold green]{format_bytes(net_stats['month'])}[/bold green]")
+        net_table.add_row("󰓅 Highest Ever Daily", f"[bold bright_cyan]{format_bytes(net_stats['highest'])}[/bold bright_cyan]")
+    else:
+        net_table.add_row("Status", f"[bold red]{net_stats}[/bold red]")
+
+    console.print(Panel(net_table, title="[bold bright_cyan] Network Traffic Summary [/bold bright_cyan]", box=box.ROUNDED, border_style="cyan"))
+
+    # 3. Responsive Weekly Usage Chart
+    if weekly_entries:
+        week_table = Table(box=box.SIMPLE_HEAD, show_header=True, header_style="bold bright_green", border_style="dim green", expand=True)
+        week_table.add_column("Date", style="bold white")
+        week_table.add_column("Active Hours", style="bold bright_green")
+        week_table.add_column("Uptime", style="bright_green", justify="right")
+        week_table.add_column("Locked", style="yellow", justify="right")
+
+        for entry in weekly_entries:
+            d_str = entry["date"].strftime("%b %d (%a)")
+            act_sec = entry["active_sec"]
+            bar = make_compact_bar(act_sec, 24 * 3600, max_len=8, color="bright_green")
+            
+            h = act_sec // 3600
+            m = (act_sec % 3600) // 60
+            up_h = entry["total_up"] // 3600
+            up_m = (entry["total_up"] % 3600) // 60
+            loc_h = entry["locked_sec"] // 3600
+            loc_m = (entry["locked_sec"] % 3600) // 60
+
+            week_table.add_row(
+                d_str,
+                f"{bar} {h}h {m:02d}m",
+                f"{up_h}h {up_m:02d}m",
+                f"{loc_h}h {loc_m:02d}m" if loc_h > 0 else f"{loc_m}m"
+            )
+
+        console.print(Panel(week_table, title="[bold bright_green] 󰨖 This Week System Usage & Active Hours [/bold bright_green]", box=box.ROUNDED, border_style="bright_green"))
+
+    # 4. System Analytics Bottom Box (Minimal 2 Columns: Metric & Value/Duration)
+    sys_table = Table(box=box.ROUNDED, show_header=True, header_style="bold yellow", border_style="yellow", expand=True)
+    sys_table.add_column("System Metric", style="bold white")
+    sys_table.add_column("Value / Duration", style="bold green", justify="right")
+
+    if "current_duration" in tuptime_lifetime:
+        curr_dur = tuptime_lifetime["current_duration"]
+        curr_dt = format_short_dt(tuptime_lifetime.get("current_date", ""))
+        sys_table.add_row("󱎫 Current Session", f"{curr_dur} (Started {curr_dt})")
+
+    if weekly_entries:
+        today_entry = weekly_entries[-1]
+        t_act_h = today_entry["active_sec"] // 3600
+        t_act_m = (today_entry["active_sec"] % 3600) // 60
+        t_up_h = today_entry["total_up"] // 3600
+        t_up_m = (today_entry["total_up"] % 3600) // 60
+        sys_table.add_row("󰔟 Today's Active / Uptime", f"{t_act_h}h {t_act_m:02d}m active / {t_up_h}h {t_up_m:02d}m uptime")
+
+    if "longest_duration" in tuptime_period:
+        p_dur = tuptime_period["longest_duration"]
+        p_dt = format_short_dt(tuptime_period.get("longest_date", ""))
+        sys_table.add_row("󰨖 Longest Session Per Day", f"{p_dur} ({p_dt})")
+
+    if "longest_duration" in tuptime_lifetime:
+        long_dur = tuptime_lifetime["longest_duration"]
+        long_dt = format_short_dt(tuptime_lifetime.get("longest_date", ""))
+        sys_table.add_row("󰓅 Longest Session Ever", f"[bold bright_magenta]{long_dur}[/bold bright_magenta] ({long_dt})")
+
+    if "system_uptime" in tuptime_lifetime:
+        sys_table.add_row("󰌢 Lifetime System Uptime", tuptime_lifetime["system_uptime"])
+
+    console.print(Panel(sys_table, title="[bold yellow] 󰔟 System Session Analytics [/bold yellow]", box=box.ROUNDED, border_style="yellow"))
+
+def render_plain_ui(interface, net_stats, tuptime_lifetime, tuptime_period):
+    print("=" * 65)
+    print("       SYSTEM USAGE & NETWORK DASHBOARD")
+    print("=" * 65)
+    
+    print(f"\n[+] Network Usage (Interface: {interface})")
+    if isinstance(net_stats, dict):
+        print(f"  - Today's Usage:         {format_bytes(net_stats['today'])}")
+        print(f"  - This Month's Usage:    {format_bytes(net_stats['month'])}")
+        print(f"  - Highest Ever Daily:    {format_bytes(net_stats['highest'])}")
+    else:
+        print(f"  [-] Network statistics query failed: {net_stats}")
+        
+    print(f"\n[+] System Session Analytics")
+    if "current_duration" in tuptime_lifetime:
+        print(f"  - Current Uptime Session:  {tuptime_lifetime['current_duration']} (Started {format_short_dt(tuptime_lifetime.get('current_date', ''))})")
+    if "longest_duration" in tuptime_lifetime:
+        print(f"  - Longest Session Ever:    {tuptime_lifetime['longest_duration']} (Started {format_short_dt(tuptime_lifetime.get('longest_date', ''))})")
+    if "average" in tuptime_lifetime:
+        print(f"  - Average Session Length:  {tuptime_lifetime['average']}")
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Calculate system network usage and historical uptime for a particular time period.",
+        description="System Network Usage & System Uptime Analytics Dashboard (btop++ TUI).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  %(prog)s --start 7d                    # Last 7 days
-  %(prog)s --start 30d --end yesterday   # Last 30 days up to yesterday
-  %(prog)s -s 2026-06-01 -e 2026-06-15   # Specific date range
+  %(prog)s                               # Run btop++ TUI dashboard
+  %(prog)s --plain                       # Output in plain text format
+  %(prog)s -i wlan0                      # Specify network interface
 """
     )
-    parser.add_argument("-s", "--start", default="7d", help="Start date (e.g. 2026-06-01, 7d, 30d, 1m). Default: 7d")
-    parser.add_argument("-e", "--end", default="today", help="End date (e.g. 2026-06-15, today, yesterday). Default: today")
-    parser.add_argument("-i", "--interface", help="Network interface (e.g. wlan0, eth0). Auto-detected if omitted.")
+    parser.add_argument("-s", "--start", default="7d", help="Start date. Default: 7d")
+    parser.add_argument("-e", "--end", default="today", help="End date. Default: today")
+    parser.add_argument("-i", "--interface", help="Network interface. Auto-detected if omitted.")
+    parser.add_argument("--plain", action="store_true", help="Output plain text instead of btop++ TUI dashboard.")
     
     args = parser.parse_args()
     
-    # 1. Dependency checks
     missing = check_dependencies()
     if missing:
         print("[-] Missing required system packages:", ", ".join(missing), file=sys.stderr)
-        print("\nTo install and configure them on Fedora Linux, run:", file=sys.stderr)
-        print("  sudo dnf install -y vnstat tuptime", file=sys.stderr)
-        print("  sudo systemctl enable --now vnstat tuptime.timer", file=sys.stderr)
-        print("\nNote: vnstat starts tracking traffic immediately after its service is started.", file=sys.stderr)
         sys.exit(1)
         
-    # 2. Date parsing
-    try:
-        start_date = parse_relative_date(args.start)
-        end_date = parse_relative_date(args.end)
-    except ValueError as e:
-        print(f"[-] Date Parsing Error: {e}", file=sys.stderr)
-        sys.exit(1)
-        
-    if start_date > end_date:
-        print("[-] Error: Start date cannot be after end date.", file=sys.stderr)
-        sys.exit(1)
-        
-    # 3. Interface selection
     interface = args.interface
     if not interface:
         interface = get_default_interface()
         tracked = get_vnstat_interfaces()
-        
         if interface and interface not in tracked:
-            # Default interface isn't tracked, let's use the first tracked one if available
             if tracked:
                 interface = tracked[0]
         elif not interface and tracked:
@@ -364,117 +432,27 @@ def main():
         print("[-] Error: No network interfaces detected or tracked by vnstat.", file=sys.stderr)
         sys.exit(1)
         
-    print("=" * 65)
-    print(f"       SYSTEM REPORT: {start_date} to {end_date}")
-    print("=" * 65)
+    net_stats = get_vnstat_totals(interface)
     
-    # 4. Gather & Display Network Data
-    print(f"\n[+] Network Statistics (Interface: {interface})")
-    net_data = run_vnstat(interface, start_date, end_date)
+    lifetime_tuptime_out = subprocess.run(["tuptime"], capture_output=True, text=True).stdout
+    tuptime_lifetime = parse_tuptime_regex(lifetime_tuptime_out)
     
-    # Fetch today's usage specifically
-    today_date = datetime.now().date()
-    today_data = run_vnstat(interface, today_date, today_date)
-    
-    if isinstance(net_data, dict):
-        print(f"  - Received (Download):   {format_bytes(net_data['rx'])}")
-        print(f"  - Transmitted (Upload):  {format_bytes(net_data['tx'])}")
-        print(f"  - Total Data Usage:      {format_bytes(net_data['total'])}")
+    tuptime_period = {}
+    try:
+        from_d = datetime.now().date() - timedelta(days=7)
+        s_epoch = int(datetime(from_d.year, from_d.month, from_d.day, 0, 0, 0).timestamp())
+        e_epoch = int(datetime.now().timestamp())
+        period_out = subprocess.run(["tuptime", "--tsince", str(s_epoch), "--tuntil", str(e_epoch)], capture_output=True, text=True).stdout
+        tuptime_period = parse_tuptime_regex(period_out)
+    except Exception:
+        pass
         
-        if isinstance(today_data, dict):
-            print(f"  - Today's Usage:         {format_bytes(today_data['total'])}")
-        else:
-            print(f"  - Today's Usage:         0.00 B")
+    weekly_entries = get_weekly_usage()
+
+    if args.plain or not RICH_AVAILABLE:
+        render_plain_ui(interface, net_stats, tuptime_lifetime, tuptime_period)
     else:
-        print(f"  [-] Network statistics query failed: {net_data}")
-        
-    # 5. Gather & Display Uptime Data
-    print(f"\n[+] System Uptime Statistics")
-    uptime_data = run_tuptime(start_date, end_date)
-    if uptime_data.startswith("Permission Denied") or uptime_data.startswith("Error running tuptime"):
-        print(f"  [-] {uptime_data}")
-    elif uptime_data:
-        # Parse period stats
-        period_stats = parse_tuptime_stats(uptime_data)
-        
-        # Fetch today's uptime stats
-        today_date = datetime.now().date()
-        today_data = run_tuptime(today_date, today_date)
-        today_stats = {}
-        if today_data and not (today_data.startswith("Permission Denied") or today_data.startswith("Error running tuptime")):
-            today_stats = parse_tuptime_stats(today_data)
-            
-        # Display stats
-        if "startups" in period_stats:
-            print(f"  {period_stats['startups']}")
-        if "shutdowns" in period_stats:
-            print(f"  {period_stats['shutdowns']}")
-        if "life" in period_stats:
-            print(f"  {period_stats['life']}")
-            
-        # Calculate start and end epoch for the period
-        start_dt = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0)
-        end_dt = datetime(end_date.year, end_date.month, end_date.day, 23, 59, 59)
-        since_epoch = int(start_dt.timestamp())
-        until_epoch = int(end_dt.timestamp())
-        
-        # System intervals and locked seconds for the period
-        period_intervals = get_system_intervals(since_epoch, until_epoch)
-        period_total_uptime = sum(end - start for start, end in period_intervals)
-        period_locked = get_lock_intervals(since_epoch, until_epoch, period_intervals)
-        period_active = max(0, period_total_uptime - period_locked)
-        
-        # Calculate period system life for active percentage
-        period_pct = period_stats.get("system_uptime_pct", 0.0)
-        if period_pct > 0.0:
-            period_life = period_total_uptime / (period_pct / 100.0)
-            period_active_pct = (period_active / period_life) * 100.0 if period_life > 0 else 0.0
-        else:
-            period_life = until_epoch - since_epoch
-            period_active_pct = (period_active / period_life) * 100.0 if period_life > 0 else 0.0
-            
-        # Today's stats
-        today_start_dt = datetime(today_date.year, today_date.month, today_date.day, 0, 0, 0)
-        today_end_dt = datetime(today_date.year, today_date.month, today_date.day, 23, 59, 59)
-        today_since_epoch = int(today_start_dt.timestamp())
-        today_until_epoch = int(today_end_dt.timestamp())
-        
-        today_intervals = get_system_intervals(today_since_epoch, today_until_epoch)
-        today_total_uptime = sum(end - start for start, end in today_intervals)
-        today_locked = get_lock_intervals(today_since_epoch, today_until_epoch, today_intervals)
-        today_active = max(0, today_total_uptime - today_locked)
-        
-        today_pct = today_stats.get("system_uptime_pct", 0.0)
-        if today_pct > 0.0:
-            today_life = today_total_uptime / (today_pct / 100.0)
-            today_active_pct = (today_active / today_life) * 100.0 if today_life > 0 else 0.0
-        else:
-            today_life = today_until_epoch - today_since_epoch
-            today_active_pct = (today_active / today_life) * 100.0 if today_life > 0 else 0.0
-        
-        has_details = any(k in period_stats for k in ["longest", "average", "system_uptime"]) or "system_uptime" in today_stats
-        if has_details:
-            print()
-            if "longest" in period_stats:
-                print(f"  {period_stats['longest']}")
-            if "average" in period_stats:
-                print(f"  {period_stats['average']}")
-            if "system_uptime" in period_stats:
-                active_pct_str = f"{period_active_pct:5.2f}%"
-                active_str = format_duration(period_active)
-                print(f"  System uptime:        {active_pct_str}  =  {active_str}")
-            if "system_uptime" in today_stats:
-                today_active_pct_str = f"{today_active_pct:5.2f}%"
-                today_active_str = format_duration(today_active)
-                print(f"  Today's uptime:       {today_active_pct_str}  =  {today_active_str}")
-                    
-        if "current" in period_stats:
-            print()
-            print(f"  {period_stats['current']}")
-    else:
-        print("  [-] Uptime statistics query returned no output.")
-        
-    print("\n" + "=" * 65)
+        render_btop_ui(interface, net_stats, tuptime_lifetime, tuptime_period, weekly_entries)
 
 if __name__ == "__main__":
     main()

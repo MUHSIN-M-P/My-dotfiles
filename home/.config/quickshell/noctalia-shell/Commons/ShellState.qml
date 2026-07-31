@@ -74,6 +74,9 @@ Singleton {
 
       // Launcher app usage counts
       property var launcherUsage: ({})
+
+      // Launcher app last used timestamps
+      property var launcherLastUsed: ({})
     }
 
     onLoaded: {
@@ -93,30 +96,71 @@ Singleton {
     }
   }
 
+  // Helper for key normalization
+  function normalizeKey(key) {
+    if (!key)
+      return "";
+    let k = String(key).toLowerCase().trim();
+    if (k.endsWith(".desktop")) {
+      k = k.substring(0, k.length - 8);
+    }
+    return k;
+  }
+
   // Launcher usage
   function getLauncherUsageCount(key) {
+    const k = normalizeKey(key);
     const m = adapter.launcherUsage;
     if (!m)
       return 0;
-    const v = m[key];
+    const v = m[k];
+    return typeof v === 'number' && isFinite(v) ? v : 0;
+  }
+
+  function getLauncherLastUsed(key) {
+    const k = normalizeKey(key);
+    const m = adapter.launcherLastUsed;
+    if (!m)
+      return 0;
+    const v = m[k];
     return typeof v === 'number' && isFinite(v) ? v : 0;
   }
 
   function recordLauncherUsage(key) {
+    const k = normalizeKey(key);
+    if (!k) return;
+
     let counts = Object.assign({}, adapter.launcherUsage || {});
-    counts[key] = getLauncherUsageCount(key) + 1;
+    counts[k] = getLauncherUsageCount(k) + 1;
     adapter.launcherUsage = counts;
+
+    let lastUsedMap = Object.assign({}, adapter.launcherLastUsed || {});
+    lastUsedMap[k] = Date.now();
+    adapter.launcherLastUsed = lastUsedMap;
+
     save();
   }
 
   // Migrate usage from one key to another, merging counts in a single save
   function migrateLauncherUsage(fromKey, toKey) {
+    const fk = normalizeKey(fromKey);
+    const tk = normalizeKey(toKey);
+    if (!fk || !tk || fk === tk) return;
+
     let counts = Object.assign({}, adapter.launcherUsage || {});
-    const fromCount = typeof counts[fromKey] === 'number' && isFinite(counts[fromKey]) ? counts[fromKey] : 0;
-    const toCount = typeof counts[toKey] === 'number' && isFinite(counts[toKey]) ? counts[toKey] : 0;
-    counts[toKey] = toCount + fromCount;
-    delete counts[fromKey];
+    const fromCount = typeof counts[fk] === 'number' && isFinite(counts[fk]) ? counts[fk] : 0;
+    const toCount = typeof counts[tk] === 'number' && isFinite(counts[tk]) ? counts[tk] : 0;
+    counts[tk] = toCount + fromCount;
+    delete counts[fk];
     adapter.launcherUsage = counts;
+
+    let lastUsedMap = Object.assign({}, adapter.launcherLastUsed || {});
+    const fromTime = typeof lastUsedMap[fk] === 'number' && isFinite(lastUsedMap[fk]) ? lastUsedMap[fk] : 0;
+    const toTime = typeof lastUsedMap[tk] === 'number' && isFinite(lastUsedMap[tk]) ? lastUsedMap[tk] : 0;
+    lastUsedMap[tk] = Math.max(fromTime, toTime);
+    delete lastUsedMap[fk];
+    adapter.launcherLastUsed = lastUsedMap;
+
     save();
   }
 
