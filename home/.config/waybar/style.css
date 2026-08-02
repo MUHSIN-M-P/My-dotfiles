@@ -1,0 +1,104 @@
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "JetBrainsMono NF", "Montserrat", sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 0;
+    transition: all 0.3s cubic-bezier(0.05, 0.9, 0.1, 1.0);
+}
+
+window#waybar {
+    background-color: transparent;
+    color: #e2e2e2;
+}
+
+/* ── Pill Container Styling ── */
+.modules-left, .modules-center, .modules-right {
+    background: rgba(19, 20, 14, 0.75);
+    border: 1px solid rgba(184, 208, 110, 0.25);
+    border-radius: 18px;
+    padding: 2px 10px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Workspaces Pill Module ── */
+#workspaces {
+    background: transparent;
+    padding: 0;
+}
+
+#workspaces button {
+    padding: 2px 8px;
+    color: #808080;
+    background: transparent;
+    border-radius: 12px;
+    margin: 2px 3px;
+}
+
+#workspaces button:hover {
+    background: rgba(184, 208, 110, 0.2);
+    color: #b8d06e;
+}
+
+#workspaces button.active {
+    color: #13140e;
+    background: #b8d06e;
+    box-shadow: 0px 2px 8px rgba(184, 208, 110, 0.4);
+}
+
+#workspaces button.urgent {
+    background: #ffb4ab;
+    color: #690005;
+}
+
+/* ── Active Window Title ── */
+#window {
+    padding: 0 10px;
+    color: #c1cb9d;
+}
+
+/* ── Clock Center Module ── */
+#clock {
+    color: #b8d06e;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* ── Status Modules ── */
+#pulseaudio, #network, #cpu, #memory, #battery, #tray {
+    padding: 0 10px;
+    color: #e2e2e2;
+    margin: 2px 2px;
+    border-radius: 10px;
+}
+
+#pulseaudio:hover, #network:hover, #cpu:hover, #memory:hover, #battery:hover {
+    background: rgba(184, 208, 110, 0.15);
+    color: #b8d06e;
+}
+
+#battery.charging, #battery.plugged {
+    color: #b8d06e;
+}
+
+#battery.warning {
+    color: #ffb4ab;
+}
+
+#battery.critical {
+    color: #ff5555;
+    animation-name: blink;
+    animation-duration: 0.8s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+@keyframes blink {
+    to {
+        background-color: #ff5555;
+        color: #ffffff;
+    }
+}

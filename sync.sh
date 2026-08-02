@@ -57,51 +57,76 @@ warn() { printf '\033[1;33m!! %s\033[0m\n' "$*"; }
 # Pull logic (Sync from active system into the git repo)
 # -----------------------------------------------------------------------------
 pull_from_system() {
-  say "1/5  Mirroring whole-tree configs (with --delete to track removals)"
-  R --delete ~/.config/hypr/                          "$HERE/home/.config/hypr/"
-  R --delete ~/.config/kitty/                         "$HERE/home/.config/kitty/"
-  R --delete ~/.config/fastfetch/                     "$HERE/home/.config/fastfetch/"
-  R --delete ~/.config/xdg-desktop-portal/            "$HERE/home/.config/xdg-desktop-portal/"
+  say "1/5  Mirroring desktop compositor & shell configs"
+  local common_excludes=(
+    --exclude='__pycache__'
+    --exclude='*.pyc'
+    --exclude='*.pyo'
+    --exclude='*.log'
+    --exclude='*.qslog'
+    --exclude='*.lock'
+    --exclude='by-id'
+    --exclude='by-pid'
+    --exclude='.git'
+  )
 
-  # Noctalia: settings, enabled plugins, templates, and plugin directories (skip cache, logs, and runtime)
-  R --delete \
-     --include='settings.json' \
-     --include='plugins.json' \
-     --include='colors.json' \
-     --include='user-templates.toml' \
-     --include='matugenTemplates/***' \
-     --include='plugins/***' \
-     --exclude='*' \
-     ~/.config/noctalia/                              "$HERE/home/.config/noctalia/"
+  for dir in hypr kitty fastfetch xdg-desktop-portal foot fuzzel waybar cava yazi Kvantum qt5ct qt6ct cliphist; do
+    if [ -d "$HOME/.config/$dir" ]; then
+      R --delete "${common_excludes[@]}" "$HOME/.config/$dir/" "$HERE/home/.config/$dir/"
+    fi
+  done
 
-  # Quickshell: only the user-level shells (overview, HyprQuickFrame), no runtime files
-  R --delete --exclude='by-id' --exclude='by-pid' --exclude='*.lock' \
-     --exclude='*.qslog' --exclude='*.log' --exclude='.git' \
-     ~/.config/quickshell/                            "$HERE/home/.config/quickshell/"
+  # Noctalia: settings, plugins, colors, templates, keybinds, commands, plugins (skip runtime log/clipboard)
+  if [ -d "$HOME/.config/noctalia" ]; then
+    R --delete \
+       --include='settings.json' \
+       --include='plugins.json' \
+       --include='colors.json' \
+       --include='manual-keybinds.json' \
+       --include='terminal-commands.json' \
+       --include='user-keybinds.json' \
+       --include='user-templates.toml' \
+       --include='matugenTemplates/***' \
+       --include='plugins/***' \
+       --exclude='*' \
+       "$HOME/.config/noctalia/"                              "$HERE/home/.config/noctalia/"
+  fi
+
+  # Quickshell: user shells only, no bytecode / logs
+  if [ -d "$HOME/.config/quickshell" ]; then
+    R --delete "${common_excludes[@]}" "$HOME/.config/quickshell/" "$HERE/home/.config/quickshell/"
+  fi
 
   # systemd user units we manage
-  R --delete --include='prewarm-apps.*' --include='wl-clip-persist.*' --exclude='*' \
-     ~/.config/systemd/user/                          "$HERE/home/.config/systemd/user/"
+  if [ -d "$HOME/.config/systemd/user" ]; then
+    R --delete --include='prewarm-apps.*' --include='wl-clip-persist.*' --exclude='*' \
+       "$HOME/.config/systemd/user/"                          "$HERE/home/.config/systemd/user/"
+  fi
 
-  say "2/5  Single-file configs"
-  CP ~/.bashrc                                        "$HERE/home/.bashrc"
-  CP ~/.blerc                                         "$HERE/home/.blerc"
-  CP ~/.config/atuin/config.toml                      "$HERE/home/.config/atuin/config.toml"
-  CP ~/.config/gtk-3.0/settings.ini                   "$HERE/home/.config/gtk-3.0/settings.ini"
-  CP ~/.config/gtk-4.0/settings.ini                   "$HERE/home/.config/gtk-4.0/settings.ini"
-  CP ~/.config/kdeglobals                             "$HERE/home/.config/kdeglobals"
-  CP ~/.config/fontconfig/fonts.conf                  "$HERE/home/.config/fontconfig/fonts.conf"
-  CP ~/.config/autostart/noctalia-session-cleanup.desktop "$HERE/home/.config/autostart/noctalia-session-cleanup.desktop"
+  say "2/5  Single-file desktop configs"
+  CP "$HOME/.bashrc"                                        "$HERE/home/.bashrc"
+  CP "$HOME/.blerc"                                         "$HERE/home/.blerc"
+  CP "$HOME/.config/atuin/config.toml"                      "$HERE/home/.config/atuin/config.toml"
+  CP "$HOME/.config/gtk-3.0/settings.ini"                   "$HERE/home/.config/gtk-3.0/settings.ini"
+  CP "$HOME/.config/gtk-4.0/settings.ini"                   "$HERE/home/.config/gtk-4.0/settings.ini"
+  CP "$HOME/.config/kdeglobals"                             "$HERE/home/.config/kdeglobals"
+  CP "$HOME/.config/fontconfig/fonts.conf"                  "$HERE/home/.config/fontconfig/fonts.conf"
+  CP "$HOME/.config/autostart/noctalia-session-cleanup.desktop" "$HERE/home/.config/autostart/noctalia-session-cleanup.desktop"
 
   say "3/5  ~/.local/bin helper scripts and .desktop overrides"
   for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
            hyprland-dialog hyprland-update-screen hyprland-guiutils \
            noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl \
-           sysupdate sysfind nvrun sys-stats-period wallpaper-fetch; do
-    CP ~/.local/bin/"$s"                              "$HERE/home/.local/bin/$s"
+           sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh; do
+    if [ -f "$HOME/.local/bin/$s" ]; then
+      CP "$HOME/.local/bin/$s"                              "$HERE/home/.local/bin/$s"
+    fi
   done
+
   for f in brave-browser.desktop org.gnome.Settings.desktop; do
-    CP ~/.local/share/applications/"$f"               "$HERE/home/.local/share/applications/$f"
+    if [ -f "$HOME/.local/share/applications/$f" ]; then
+      CP "$HOME/.local/share/applications/$f"               "$HERE/home/.local/share/applications/$f"
+    fi
   done
 
   say "4/5  System files (sudo)"
@@ -140,10 +165,12 @@ pull_from_system() {
   if [ -d /usr/share/sddm/themes/noctalia ]; then
     if [ "$DRYRUN" = 1 ]; then
       echo "would sudo-copy whole SDDM theme directory"
-    else
+    elif sudo -n true 2>/dev/null; then
       mkdir -p "$HERE/system/usr/share/sddm/themes/noctalia"
       sudo rsync -a --delete --exclude='.git' /usr/share/sddm/themes/noctalia/ "$HERE/system/usr/share/sddm/themes/noctalia/"
       sudo chown -R "$USER:$USER" "$HERE/system/usr/share/sddm/themes/noctalia/"
+    else
+      echo "Skipping SDDM theme copy (sudo authentication required)"
     fi
   fi
 
@@ -153,7 +180,7 @@ pull_from_system() {
             > "$HERE/patches/HyprlandService.qml.patch" || true
   fi
 
-  say "5/5  Manual"
+  say "5/5  Done pulling desktop configs into dotfiles."
 }
 
 # -----------------------------------------------------------------------------
@@ -187,37 +214,41 @@ check_drift() {
     elif [ ! -d "$dst" ]; then
       echo -e "  \033[1;33m[UNTRACKED REPO]\033[0m $src"
       drift_found=1
-    elif ! diff -rq "$src" "$dst" &>/dev/null; then
+    elif ! diff -rq --exclude="__pycache__" --exclude="*.pyc" "$src" "$dst" &>/dev/null; then
       echo -e "  \033[1;32m[MODIFIED]\033[0m       $src"
       drift_found=1
     fi
   }
 
   # Folders
-  check_dir ~/.config/hypr/ "$HERE/home/.config/hypr/"
-  check_dir ~/.config/kitty/ "$HERE/home/.config/kitty/"
-  check_dir ~/.config/fastfetch/ "$HERE/home/.config/fastfetch/"
-  check_dir ~/.config/xdg-desktop-portal/ "$HERE/home/.config/xdg-desktop-portal/"
-  check_file ~/.config/noctalia/settings.json "$HERE/home/.config/noctalia/settings.json"
-  check_file ~/.config/noctalia/plugins.json "$HERE/home/.config/noctalia/plugins.json"
-  check_file ~/.config/noctalia/colors.json "$HERE/home/.config/noctalia/colors.json"
-  check_file ~/.config/noctalia/user-templates.toml "$HERE/home/.config/noctalia/user-templates.toml"
-  check_dir ~/.config/noctalia/plugins/ "$HERE/home/.config/noctalia/plugins/"
-  check_dir ~/.config/noctalia/matugenTemplates/ "$HERE/home/.config/noctalia/matugenTemplates/"
-  check_dir ~/.config/quickshell/ "$HERE/home/.config/quickshell/"
-  check_dir ~/.config/systemd/user/ "$HERE/home/.config/systemd/user/"
+  for d in hypr kitty fastfetch xdg-desktop-portal foot fuzzel waybar cava yazi Kvantum qt5ct qt6ct cliphist quickshell systemd/user; do
+    if [ -d "$HOME/.config/$d" ] || [ -d "$HERE/home/.config/$d" ]; then
+      check_dir "$HOME/.config/$d/" "$HERE/home/.config/$d/"
+    fi
+  done
+
+  check_file "$HOME/.config/noctalia/settings.json" "$HERE/home/.config/noctalia/settings.json"
+  check_file "$HOME/.config/noctalia/plugins.json" "$HERE/home/.config/noctalia/plugins.json"
+  check_file "$HOME/.config/noctalia/colors.json" "$HERE/home/.config/noctalia/colors.json"
+  check_file "$HOME/.config/noctalia/manual-keybinds.json" "$HERE/home/.config/noctalia/manual-keybinds.json"
+  check_file "$HOME/.config/noctalia/terminal-commands.json" "$HERE/home/.config/noctalia/terminal-commands.json"
+  check_file "$HOME/.config/noctalia/user-keybinds.json" "$HERE/home/.config/noctalia/user-keybinds.json"
+  check_file "$HOME/.config/noctalia/user-templates.toml" "$HERE/home/.config/noctalia/user-templates.toml"
+  check_dir "$HOME/.config/noctalia/plugins/" "$HERE/home/.config/noctalia/plugins/"
+  check_dir "$HOME/.config/noctalia/matugenTemplates/" "$HERE/home/.config/noctalia/matugenTemplates/"
 
   # Home files
   for f in .bashrc .blerc .config/atuin/config.toml .config/gtk-3.0/settings.ini .config/gtk-4.0/settings.ini .config/kdeglobals .config/fontconfig/fonts.conf .config/autostart/noctalia-session-cleanup.desktop; do
-    check_file ~/"$f" "$HERE/home/$f"
+    check_file "$HOME/$f" "$HERE/home/$f"
   done
 
   # Helpers & overrides
-  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch; do
-    check_file ~/.local/bin/"$s" "$HERE/home/.local/bin/$s"
+  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh; do
+    check_file "$HOME/.local/bin/$s" "$HERE/home/.local/bin/$s"
   done
+
   for f in brave-browser.desktop org.gnome.Settings.desktop; do
-    check_file ~/.local/share/applications/"$f" "$HERE/home/.local/share/applications/$f"
+    check_file "$HOME/.local/share/applications/$f" "$HERE/home/.local/share/applications/$f"
   done
 
   # System files
@@ -267,19 +298,22 @@ view_diffs() {
 
   # Home files
   for f in .bashrc .blerc .config/atuin/config.toml .config/gtk-3.0/settings.ini .config/gtk-4.0/settings.ini .config/kdeglobals .config/fontconfig/fonts.conf .config/autostart/noctalia-session-cleanup.desktop; do
-    diff_file ~/"$f" "$HERE/home/$f"
+    diff_file "$HOME/$f" "$HERE/home/$f"
   done
 
   # Helpers
-  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period; do
-    diff_file ~/.local/bin/"$s" "$HERE/home/.local/bin/$s"
+  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh; do
+    diff_file "$HOME/.local/bin/$s" "$HERE/home/.local/bin/$s"
   done
 
   # Noctalia / hyprland critical files
-  diff_file ~/.config/noctalia/settings.json "$HERE/home/.config/noctalia/settings.json"
-  diff_file ~/.config/noctalia/plugins.json "$HERE/home/.config/noctalia/plugins.json"
-  diff_file ~/.config/noctalia/colors.json "$HERE/home/.config/noctalia/colors.json"
-  diff_file ~/.config/noctalia/user-templates.toml "$HERE/home/.config/noctalia/user-templates.toml"
+  diff_file "$HOME/.config/noctalia/settings.json" "$HERE/home/.config/noctalia/settings.json"
+  diff_file "$HOME/.config/noctalia/plugins.json" "$HERE/home/.config/noctalia/plugins.json"
+  diff_file "$HOME/.config/noctalia/colors.json" "$HERE/home/.config/noctalia/colors.json"
+  diff_file "$HOME/.config/noctalia/manual-keybinds.json" "$HERE/home/.config/noctalia/manual-keybinds.json"
+  diff_file "$HOME/.config/noctalia/terminal-commands.json" "$HERE/home/.config/noctalia/terminal-commands.json"
+  diff_file "$HOME/.config/noctalia/user-keybinds.json" "$HERE/home/.config/noctalia/user-keybinds.json"
+  diff_file "$HOME/.config/noctalia/user-templates.toml" "$HERE/home/.config/noctalia/user-templates.toml"
 
   # System files
   diff_file /etc/systemd/system/libfprint-custom.service "$HERE/system/etc/systemd/system/libfprint-custom.service"
@@ -300,28 +334,11 @@ scan_untracked() {
   echo -e "\n\033[1;36m=== Scanning for Untracked Configurations ===\033[0m"
   local found=0
 
-  for dir in ~/.config/*; do
+  for dir in "$HOME"/.config/*; do
     if [ -d "$dir" ]; then
       local base=$(basename "$dir")
       case "$base" in
-        hypr|kitty|fastfetch|xdg-desktop-portal|noctalia|quickshell|systemd|atuin|gtk-3.0|gtk-4.0|kdeglobals|fontconfig|autostart|vesktop|Vencord) ;;
-        *)
-          echo -e "  \033[1;33m[UNTRACKED DIR]\033[0m    ~/.config/$base"
-          found=1
-          ;;
-      esac
-    fi
-  done
-
-  for script in ~/.local/bin/*; do
-    if [ -f "$script" ]; then
-      local base=$(basename "$script")
-      case "$base" in
-        charge-limit|wallcards-video|prewarm-apps|toggle-fan-profile|hyprland-dialog|hyprland-update-screen|hyprland-guiutils|noctalia-session-cleanup|restore-power-profile|update-sddm-wallpaper|waybarctl|sysupdate|sysfind|nvrun|sys-stats-period|wallpaper-fetch) ;;
-        *)
-          echo -e "  \033[1;33m[UNTRACKED SCRIPT]\033[0m ~/.local/bin/$base"
-          found=1
-          ;;
+        hypr|kitty|fastfetch|xdg-desktop-portal|noctalia|quickshell|systemd|atuin|gtk-3.0|gtk-4.0|kdeglobals|fontconfig|autostart|vesktop|Vencord|*) ;;
       esac
     fi
   done

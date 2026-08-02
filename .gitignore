@@ -3,23 +3,41 @@ home/.cache/
 home/.local/state/
 home/.config/atuin/history.db
 home/.config/atuin/key
+home/.config/noctalia/pinned_clipboard.json
+home/.config/noctalia/shell.log
 
-# Quickshell runtime sockets / logs
+# Quickshell runtime sockets / logs / cache
 home/.config/quickshell/**/by-id/
 home/.config/quickshell/**/by-pid/
 home/.config/quickshell/**/*.lock
 home/.config/quickshell/**/*.qslog
 home/.config/quickshell/**/*.log
 
+# Python bytecode / caches
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Browser profiles (too big, contain credentials/cookies)
 home/.config/BraveSoftware/
 home/.mozilla/
 
+# Explicitly excluded apps (not used by user)
+home/.config/btop/
+home/.config/mpv/
+home/.config/mpd/
+home/.config/rmpc/
+home/.config/nvim/
+home/.config/nvim-vscode/
+home/.config/gh/hosts.yml
+
 # Backups
 **/*.bak
 **/*.bak.*
+**/*.preinst.bak
 **/*~
 
-# Editor noise
+# Editor noise & OS files
 .DS_Store
 *.swp
