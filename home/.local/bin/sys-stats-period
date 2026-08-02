@@ -253,6 +253,58 @@ def get_lock_intervals(since_epoch, until_epoch, system_intervals):
                 
     return total_locked_seconds
 
+def get_suspended_seconds(since_epoch, until_epoch):
+    """Return total seconds the system was suspended (lid closed/sleeping) in the given window.
+    Reads 'suspend' and 'resume' events from the lock log.
+    Suspended time is excluded from both active and locked stats — it drains no battery."""
+    log_path = "/home/ldzbeta/.local/state/sys-stats-lock.log"
+    if not os.path.exists(log_path):
+        return 0
+
+    events = []
+    try:
+        with open(log_path, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) == 2:
+                    try:
+                        ts = int(parts[0])
+                        evt = parts[1].lower()
+                        if evt in ('suspend', 'resume'):
+                            events.append((ts, evt))
+                    except ValueError:
+                        continue
+    except Exception:
+        return 0
+
+    if not events:
+        return 0
+
+    events.sort(key=lambda x: x[0])
+    total_suspended = 0
+    suspend_start = None
+
+    for ts, evt in events:
+        if evt == 'suspend':
+            if suspend_start is None:
+                suspend_start = ts
+        elif evt == 'resume':
+            if suspend_start is not None:
+                t_start = max(suspend_start, since_epoch)
+                t_end = min(ts, until_epoch)
+                if t_start < t_end:
+                    total_suspended += (t_end - t_start)
+                suspend_start = None
+
+    # If currently suspended (e.g. this query runs right after sleep), count up to now
+    if suspend_start is not None:
+        t_start = max(suspend_start, since_epoch)
+        t_end = min(int(datetime.now().timestamp()), until_epoch)
+        if t_start < t_end:
+            total_suspended += (t_end - t_start)
+
+    return total_suspended
+
 def make_compact_bar(val, max_val, max_len=8, color="bright_green"):
     if max_val <= 0:
         pct = 0.0
@@ -275,12 +327,17 @@ def get_weekly_usage():
         
         intervals = get_system_intervals(s_epoch, e_epoch)
         total_up = sum(e - s for s, e in intervals)
+        suspended_sec = get_suspended_seconds(s_epoch, e_epoch)
+        # Subtract suspended time — sleep doesn't count as active or locked usage
+        awake_up = max(0, total_up - suspended_sec)
         locked_sec = get_lock_intervals(s_epoch, e_epoch, intervals)
-        active_sec = max(0, total_up - locked_sec)
+        # Locked time can't exceed awake uptime
+        locked_sec = min(locked_sec, awake_up)
+        active_sec = max(0, awake_up - locked_sec)
         
         weekly_entries.append({
             "date": day,
-            "total_up": total_up,
+            "total_up": awake_up,
             "active_sec": active_sec,
             "locked_sec": locked_sec
         })
