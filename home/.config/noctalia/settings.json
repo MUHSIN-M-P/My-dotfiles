@@ -34,7 +34,7 @@
         "preferredPlayer": "MPD",
         "spectrumFrameRate": 60,
         "spectrumMirrored": true,
-        "visualizerType": "wave",
+        "visualizerType": "mirrored",
         "volumeFeedback": false,
         "volumeFeedbackSoundFile": "",
         "volumeOverdrive": false,

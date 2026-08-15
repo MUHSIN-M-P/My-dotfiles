@@ -1,17 +1,6 @@
 {
   "todos": [
     {
-      "id": 1783741462656,
-      "text": "tafsir",
-      "completed": false,
-      "completedAt": "",
-      "createdAt": "2026-07-11T03:44:22.656Z",
-      "pageId": 0,
-      "priority": "medium",
-      "details": "",
-      "daily": true
-    },
-    {
       "id": 1783741457432,
       "text": "tech video",
       "completed": false,
@@ -41,7 +30,18 @@
       "createdAt": "2026-06-13T13:00:27.388Z",
       "pageId": 0,
       "priority": "low",
-      "details": "2:64",
+      "details": "",
+      "daily": true
+    },
+    {
+      "id": 1783741462656,
+      "text": "tafsir",
+      "completed": true,
+      "completedAt": "2026-08-15T05:19:13.839Z",
+      "createdAt": "2026-07-11T03:44:22.656Z",
+      "pageId": 0,
+      "priority": "medium",
+      "details": "2:190",
       "daily": true
     }
   ],
@@ -56,7 +56,7 @@
   "completedCount": 1,
   "showCompleted": true,
   "showBackground": true,
-  "isExpanded": false,
+  "isExpanded": true,
   "useCustomColors": false,
   "priorityColors": {
     "high": "#f44336",

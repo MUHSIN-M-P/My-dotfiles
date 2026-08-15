@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+import subprocess
+import re
+import time
+import sys
+import os
+import threading
+import socket
+import json
+
+# Set of window addresses that are in 4-finger full space mode
+four_finger_windows = set()
+
+def log(msg):
+    log_file = "/tmp/gesture_debug.log"
+    with open(log_file, "a") as f:
+        f.write(f"{time.strftime('%H:%M:%S')} - {msg}\n")
+
+def get_active_window():
+    res = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True)
+    try:
+        data = json.loads(res.stdout)
+        if isinstance(data, dict) and data.get("address"):
+            return data
+    except Exception:
+        pass
+    return None
+
+def update_screen_state():
+    active = get_active_window()
+    if active:
+        addr = active.get("address", "")
+        fs = active.get("fullscreen", 0)
+        if addr in four_finger_windows and fs == 1:
+            log(f"Screen state update: active window {addr} IS 4-finger full space. Hiding bar & border.")
+            subprocess.run(["qs", "-c", "noctalia-shell", "ipc", "call", "bar", "hideBar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["hyprctl", "keyword", "general:border_size", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["hyprctl", "keyword", "general:col.active_border", "rgba(00000000)"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+
+    log("Screen state update: active window is NOT 4-finger full space. Showing bar & border.")
+    subprocess.run(["hyprctl", "keyword", "general:border_size", "2"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["hyprctl", "keyword", "general:col.active_border", "rgba(45483aAA)"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["qs", "-c", "noctalia-shell", "ipc", "call", "bar", "showBar"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def toggle_4finger_mode(target_win=None):
+    active = target_win or get_active_window()
+    if not active:
+        return
+    addr = active.get("address", "")
+    fs = active.get("fullscreen", 0)
+
+    if addr in four_finger_windows:
+        log(f"Toggling OFF 4-finger mode on {addr}")
+        four_finger_windows.discard(addr)
+        if fs != 0:
+            subprocess.run(["hyprctl", "dispatch", "fullscreen", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        update_screen_state()
+    else:
+        log(f"Toggling ON 4-finger mode on {addr}")
+        four_finger_windows.add(addr)
+        if fs == 0:
+            subprocess.run(["hyprctl", "dispatch", "fullscreen", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif fs == 2:
+            subprocess.run(["hyprctl", "dispatch", "fullscreen", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["hyprctl", "dispatch", "fullscreen", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        update_screen_state()
+
+def unfullscreen_if_fullscreen(target_win=None):
+    active = target_win or get_active_window()
+    if active:
+        addr = active.get("address", "")
+        fs = active.get("fullscreen", 0)
+        four_finger_windows.discard(addr)
+        if fs != 0:
+            subprocess.run(["hyprctl", "dispatch", "fullscreen", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            update_screen_state()
+
+def handle_4finger_down(target_win=None):
+    active = target_win or get_active_window()
+    if active:
+        addr = active.get("address", "")
+        fs = active.get("fullscreen", 0)
+        four_finger_windows.discard(addr)
+        if fs != 0:
+            subprocess.run(["hyprctl", "dispatch", "fullscreen", "0"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log("Closing active window fast via killactive")
+    subprocess.run(["hyprctl", "dispatch", "killactive"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    update_screen_state()
+
+def socket2_listener():
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    instance_sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+    
+    if not instance_sig:
+        hypr_dir = os.path.join(runtime_dir, "hypr")
+        if os.path.exists(hypr_dir):
+            dirs = [d for d in os.listdir(hypr_dir) if os.path.isdir(os.path.join(hypr_dir, d))]
+            if dirs:
+                instance_sig = dirs[0]
+                
+    sock_path = os.path.join(runtime_dir, "hypr", instance_sig, ".socket2.sock")
+    log(f"Socket listener connecting to {sock_path}")
+    
+    while True:
+        try:
+            if not os.path.exists(sock_path):
+                time.sleep(2)
+                continue
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(sock_path)
+            buffer = ""
+            while True:
+                data = sock.recv(4096).decode('utf-8', errors='ignore')
+                if not data:
+                    break
+                buffer += data
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    if line.startswith("workspace>>") or line.startswith("activewindowv2>>") or line.startswith("closewindow>>") or line.startswith("fullscreen>>"):
+                        if line.startswith("closewindow>>"):
+                            closed_addr = "0x" + line.split(">>")[1]
+                            four_finger_windows.discard(closed_addr)
+                        time.sleep(0.05)
+                        update_screen_state()
+            sock.close()
+        except Exception as e:
+            time.sleep(2)
+
+def main():
+    sys.stdout.reconfigure(line_buffering=True)
+    with open("/tmp/gesture_debug.log", "w") as f:
+        f.write("=== Touchpad Gestures Daemon Started ===\n")
+
+    t = threading.Thread(target=socket2_listener, daemon=True)
+    t.start()
+
+    try:
+        proc = subprocess.Popen(
+            ["stdbuf", "-oL", "libinput", "debug-events"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1
+        )
+        log("Started libinput debug-events with stdbuf successfully.")
+    except Exception as e:
+        log(f"Failed to start libinput debug-events: {e}")
+        sys.exit(1)
+
+    accumulated_dx = 0.0
+    last_trigger = 0.0
+    threshold = 30.0
+    cooldown = 0.05
+
+    swipe_total_dx = 0.0
+    swipe_total_dy = 0.0
+    swipe_direction = "undecided"
+
+    swipe_4_total_dy = 0.0
+    swipe_4_active = False
+    swipe_4_triggered = False
+    swipe_4_unfullscreened = False
+    swipe_4_target_win = None
+
+    swipe_update_re = re.compile(
+        r'GESTURE_SWIPE_UPDATE\s+(?:\d+\s+)?\+?[\d\.]+s\s+(\d+)\s+([-\d.]+)\s*/\s*([-\d.]+)'
+    )
+    fallback_re = re.compile(r'dx:\s*([-\d.]+).*dy:\s*([-\d.]+)')
+
+    for line in iter(proc.stdout.readline, ''):
+        line_str = line.strip()
+        if "GESTURE_SWIPE" in line_str:
+            log(f"RAW EVENT: {line_str}")
+
+        if "GESTURE_SWIPE_BEGIN" in line:
+            swipe_total_dx = 0.0
+            swipe_total_dy = 0.0
+            swipe_direction = "undecided"
+            accumulated_dx = 0.0
+            swipe_4_total_dy = 0.0
+            swipe_4_active = False
+            swipe_4_triggered = False
+            swipe_4_target_win = get_active_window()
+            continue
+            
+        if "GESTURE_SWIPE_END" in line:
+            if swipe_4_active and not swipe_4_triggered:
+                log(f"4-finger gesture ended. total_dy={swipe_4_total_dy:.2f}")
+                if swipe_4_total_dy <= -20.0:
+                    log("Triggering 4-finger UP: toggle_4finger_mode")
+                    swipe_4_triggered = True
+                    toggle_4finger_mode(swipe_4_target_win)
+                elif swipe_4_total_dy >= 20.0:
+                    log("Triggering 4-finger DOWN: close window fast")
+                    swipe_4_triggered = True
+                    handle_4finger_down(swipe_4_target_win)
+
+            swipe_total_dx = 0.0
+            swipe_total_dy = 0.0
+            swipe_direction = "undecided"
+            accumulated_dx = 0.0
+            swipe_4_total_dy = 0.0
+            swipe_4_active = False
+            swipe_4_triggered = False
+            swipe_4_target_win = None
+            continue
+
+        if "GESTURE_SWIPE_UPDATE" in line:
+            fingers = 0
+            dx = 0.0
+            dy = 0.0
+            
+            m = swipe_update_re.search(line)
+            if m:
+                fingers = int(m.group(1))
+                dx = float(m.group(2))
+                dy = float(m.group(3))
+            else:
+                m_fb = fallback_re.search(line)
+                if m_fb:
+                    f_m = re.search(r'\s([345])\s', line)
+                    if f_m:
+                        fingers = int(f_m.group(1))
+                    dx = float(m_fb.group(1))
+                    dy = float(m_fb.group(2))
+
+            if fingers == 4:
+                swipe_4_active = True
+                swipe_4_total_dy += dy
+                if not swipe_4_target_win:
+                    swipe_4_target_win = get_active_window()
+                
+                # As 4 fingers scroll down slightly, shift window down with finger in real-time
+                if dy > 0 and swipe_4_total_dy < 25.0:
+                    shift = int(dy * 1.2)
+                    if shift > 0:
+                        subprocess.run(["hyprctl", "dispatch", "moveactive", "0", str(shift)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                if not swipe_4_triggered:
+                    if swipe_4_total_dy >= 25.0:
+                        log("Triggering 4-finger DOWN mid-swipe fast close")
+                        swipe_4_triggered = True
+                        handle_4finger_down(swipe_4_target_win)
+                    elif swipe_4_total_dy <= -25.0:
+                        log("Triggering 4-finger UP mid-swipe mode toggle")
+                        swipe_4_triggered = True
+                        toggle_4finger_mode(swipe_4_target_win)
+
+            elif fingers == 3:
+                swipe_total_dx += dx
+                swipe_total_dy += dy
+                
+                if swipe_direction == "undecided":
+                    dist_x = abs(swipe_total_dx)
+                    dist_y = abs(swipe_total_dy)
+                    if dist_x >= 6.0 or dist_y >= 6.0:
+                        if dist_x > dist_y * 1.5:
+                            swipe_direction = "horizontal"
+                        elif dist_y > dist_x * 1.5:
+                            swipe_direction = "vertical"
+                        else:
+                            if dist_x >= 12.0 or dist_y >= 12.0:
+                                swipe_direction = "horizontal" if dist_x > dist_y else "vertical"
+
+                if swipe_direction == "horizontal":
+                    accumulated_dx += dx
+                    now = time.time()
+                    if (now - last_trigger) >= cooldown:
+                        if accumulated_dx >= threshold:
+                            subprocess.run(["qs", "-c", "noctalia-shell", "ipc", "call", "volume", "increase"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            accumulated_dx = 0.0
+                            last_trigger = now
+                        elif accumulated_dx <= -threshold:
+                            subprocess.run(["qs", "-c", "noctalia-shell", "ipc", "call", "volume", "decrease"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            accumulated_dx = 0.0
+                            last_trigger = now
+
+if __name__ == "__main__":
+    main()

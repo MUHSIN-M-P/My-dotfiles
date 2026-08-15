@@ -665,7 +665,7 @@ Singleton {
     const idStr = String(id);
     const isImage = mime && mime.startsWith("image/");
     const typeArg = isImage ? ` --type ${mime}` : "";
-    const pasteKeys = isImage ? "sleep 0.15 && wtype -M ctrl -k v" : "sleep 0.15 && wtype -M ctrl v";
+    const pasteKeys = isImage ? "sleep 0.4 && wtype -M ctrl -k v" : "sleep 0.4 && wtype -M ctrl -M shift v";
 
     if (idStr.startsWith("pinned_")) {
       let pin = root.pinnedItems.find(p => p.id === idStr);
@@ -694,7 +694,7 @@ Singleton {
     if (!text)
       return;
     const escaped = text.replace(/'/g, "'\\''");
-    const cmd = `printf '%s' '${escaped}' | wl-copy && sleep 0.15 && wtype -M ctrl v`;
+    const cmd = `printf '%s' '${escaped}' | wl-copy && sleep 0.4 && wtype -M ctrl -M shift v`;
     pasteProc.command = ["sh", "-c", cmd];
     pasteProc.running = true;
   }
