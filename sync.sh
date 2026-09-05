@@ -112,6 +112,7 @@ pull_from_system() {
   CP "$HOME/.config/kdeglobals"                             "$HERE/home/.config/kdeglobals"
   CP "$HOME/.config/fontconfig/fonts.conf"                  "$HERE/home/.config/fontconfig/fonts.conf"
   CP "$HOME/.config/autostart/noctalia-session-cleanup.desktop" "$HERE/home/.config/autostart/noctalia-session-cleanup.desktop"
+  CP "$HOME/.config/noctalia/config.toml"                "$HERE/home/.config/noctalia/config.toml"
 
   say "3/5  ~/.local/bin helper scripts and .desktop overrides"
   for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
@@ -228,6 +229,7 @@ check_drift() {
   done
 
   check_file "$HOME/.config/noctalia/settings.json" "$HERE/home/.config/noctalia/settings.json"
+  check_file "$HOME/.config/noctalia/config.toml" "$HERE/home/.config/noctalia/config.toml"
   check_file "$HOME/.config/noctalia/plugins.json" "$HERE/home/.config/noctalia/plugins.json"
   check_file "$HOME/.config/noctalia/colors.json" "$HERE/home/.config/noctalia/colors.json"
   check_file "$HOME/.config/noctalia/manual-keybinds.json" "$HERE/home/.config/noctalia/manual-keybinds.json"
@@ -308,6 +310,7 @@ view_diffs() {
 
   # Noctalia / hyprland critical files
   diff_file "$HOME/.config/noctalia/settings.json" "$HERE/home/.config/noctalia/settings.json"
+  diff_file "$HOME/.config/noctalia/config.toml" "$HERE/home/.config/noctalia/config.toml"
   diff_file "$HOME/.config/noctalia/plugins.json" "$HERE/home/.config/noctalia/plugins.json"
   diff_file "$HOME/.config/noctalia/colors.json" "$HERE/home/.config/noctalia/colors.json"
   diff_file "$HOME/.config/noctalia/manual-keybinds.json" "$HERE/home/.config/noctalia/manual-keybinds.json"
