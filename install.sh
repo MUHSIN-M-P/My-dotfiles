@@ -31,6 +31,25 @@ die()  { printf '\033[1;31m## %s\033[0m\n' "$*" >&2; exit 1; }
 [ -d "$HERE/home" ] || die "Run this script from the dotfiles repo root."
 command -v dnf >/dev/null || die "dnf not found; this script targets Fedora."
 
+# ---------------------------------------------------------------------------
+# Branch-aware profile paths
+# ---------------------------------------------------------------------------
+# Detect the current git branch and set the matching noctalia config paths.
+#   main (v5):       repo dir = home/.config/noctalia       live dir = ~/.config/noctalia
+#   noctalia-v4:     repo dir = home/.config/noctalia-v4    live dir = ~/.config/noctalia-v4
+BRANCH="$(git -C "$HERE" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+if [ "$BRANCH" = "noctalia-v4" ]; then
+  NOCTALIA_REPO_DIR="$HERE/home/.config/noctalia-v4"
+  NOCTALIA_LIVE_DIR="$HOME_DIR/.config/noctalia-v4"
+  PROFILE_LABEL="Noctalia v4"
+else
+  NOCTALIA_REPO_DIR="$HERE/home/.config/noctalia"
+  NOCTALIA_LIVE_DIR="$HOME_DIR/.config/noctalia"
+  PROFILE_LABEL="Noctalia v5 (main)"
+fi
+
+say "Detected branch: $BRANCH  |  Profile: $PROFILE_LABEL"
+
 #------------------------------------------------------------------------------
 say "1/9  Enabling solopasha/hyprland COPR + Flathub"
 #------------------------------------------------------------------------------
@@ -85,7 +104,10 @@ fi
 #------------------------------------------------------------------------------
 say "4/9  Mirroring ./home/* into \$HOME (backups: existing files → *.preinst.bak)"
 #------------------------------------------------------------------------------
-( cd "$HERE/home" && find . -type f ) | while IFS= read -r f; do
+# Mirror all home files EXCEPT the noctalia config dirs (handled separately below).
+( cd "$HERE/home" && find . -type f \
+    ! -path "./.config/noctalia/*" \
+    ! -path "./.config/noctalia-v4/*" ) | while IFS= read -r f; do
   src="$HERE/home/$f"
   dst="$HOME_DIR/$f"
   if [ -e "$dst" ] && ! cmp -s "$src" "$dst"; then
@@ -93,6 +115,28 @@ say "4/9  Mirroring ./home/* into \$HOME (backups: existing files → *.preinst.
   fi
   install -D -m "$(stat -c %a "$src")" "$src" "$dst"
 done
+
+# Deploy noctalia profile for the current branch to the correct live directory.
+# v5/main  → repo:home/.config/noctalia       → live:~/.config/noctalia
+# v4       → repo:home/.config/noctalia-v4    → live:~/.config/noctalia-v4
+if [ -d "$NOCTALIA_REPO_DIR" ]; then
+  say "  Deploying $PROFILE_LABEL configs → $NOCTALIA_LIVE_DIR"
+  mkdir -p "$NOCTALIA_LIVE_DIR"
+  ( cd "$NOCTALIA_REPO_DIR" && find . -type f ) | while IFS= read -r f; do
+    src="$NOCTALIA_REPO_DIR/$f"
+    dst="$NOCTALIA_LIVE_DIR/$f"
+    if [ -e "$dst" ] && ! cmp -s "$src" "$dst"; then
+      cp -a "$dst" "$dst.preinst.bak"
+    fi
+    install -D -m "$(stat -c %a "$src")" "$src" "$dst"
+  done
+fi
+
+# Install noctalia-switch helper so both profiles can be swapped at runtime.
+if [ -f "$HERE/home/.local/bin/noctalia-switch" ]; then
+  install -D -m 0755 "$HERE/home/.local/bin/noctalia-switch" "$HOME_DIR/.local/bin/noctalia-switch"
+  say "  Installed noctalia-switch → $HOME_DIR/.local/bin/noctalia-switch"
+fi
 
 #------------------------------------------------------------------------------
 say "5/9  Applying ./system/* (needs sudo)"
@@ -223,16 +267,17 @@ sudo systemd-tmpfiles --create /etc/tmpfiles.d/charge-limit.conf || true
 sudo systemctl restart bluetooth || true
 
 #------------------------------------------------------------------------------
-say "9/9  Done."
+say "9/9  Done.  [branch: $BRANCH | profile: $PROFILE_LABEL]"
 #------------------------------------------------------------------------------
-cat <<'EOF'
+cat <<EOF
 
 Next steps:
 
-  1. Reboot, OR run `hyprctl reload` if you're already in a Hyprland session.
+  1. Reboot, OR run \`hyprctl reload\` if you're already in a Hyprland session.
   2. Open a new kitty: fastfetch + ble.sh + atuin should be live.
   3. Wallpapers: drop images/videos in ~/Pictures/Wallpapers/, then Super+Y.
-  4. Bluetooth: run `bluetoothctl scan on` and pair via blueman-applet (tray).
+  4. Bluetooth: run \`bluetoothctl scan on\` and pair via blueman-applet (tray).
+  5. To switch between v4/v5 Noctalia profiles:  noctalia-switch v4 | v5
 
 Read docs/HYPRLAND_NOCTALIA_USER_MANUAL.md for the full feature tour.
 

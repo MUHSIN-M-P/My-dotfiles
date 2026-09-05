@@ -22,6 +22,23 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# ---------------------------------------------------------------------------
+# Branch-aware profile paths
+# ---------------------------------------------------------------------------
+# Detect the current git branch and select the matching noctalia config dirs.
+# main (v5):       live dir = ~/.config/noctalia       repo dir = home/.config/noctalia
+# noctalia-v4:     live dir = ~/.config/noctalia-v4    repo dir = home/.config/noctalia-v4
+BRANCH="$(git -C "$HERE" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+if [ "$BRANCH" = "noctalia-v4" ]; then
+  NOCTALIA_LIVE="$HOME/.config/noctalia-v4"
+  NOCTALIA_REPO="$HERE/home/.config/noctalia-v4"
+  PROFILE_LABEL="Noctalia v4"
+else
+  NOCTALIA_LIVE="$HOME/.config/noctalia"
+  NOCTALIA_REPO="$HERE/home/.config/noctalia"
+  PROFILE_LABEL="Noctalia v5 (main)"
+fi
+
 # Helper: simple copy respects dry-run
 CP() {
   if [ "$DRYRUN" = 1 ]; then
@@ -57,7 +74,7 @@ warn() { printf '\033[1;33m!! %s\033[0m\n' "$*"; }
 # Pull logic (Sync from active system into the git repo)
 # -----------------------------------------------------------------------------
 pull_from_system() {
-  say "1/5  Mirroring desktop compositor & shell configs"
+  say "1/5  Mirroring desktop compositor & shell configs  [branch: $BRANCH | profile: $PROFILE_LABEL]"
   local common_excludes=(
     --exclude='__pycache__'
     --exclude='*.pyc'
@@ -77,7 +94,9 @@ pull_from_system() {
   done
 
   # Noctalia: settings, plugins, colors, templates, keybinds, commands, plugins (skip runtime log/clipboard)
-  if [ -d "$HOME/.config/noctalia" ]; then
+  # Uses branch-specific source + dest paths — v4 reads from ~/.config/noctalia-v4/
+  if [ -d "$NOCTALIA_LIVE" ]; then
+    mkdir -p "$NOCTALIA_REPO"
     R --delete \
        --include='settings.json' \
        --include='plugins.json' \
@@ -89,8 +108,11 @@ pull_from_system() {
        --include='matugenTemplates/***' \
        --include='plugins/***' \
        --exclude='*' \
-       "$HOME/.config/noctalia/"                              "$HERE/home/.config/noctalia/"
+       "$NOCTALIA_LIVE/"  "$NOCTALIA_REPO/"
   fi
+
+  # config.toml — separate file in both profiles
+  CP "$NOCTALIA_LIVE/config.toml" "$NOCTALIA_REPO/config.toml"
 
   # Quickshell: user shells only, no bytecode / logs
   if [ -d "$HOME/.config/quickshell" ]; then
@@ -100,7 +122,7 @@ pull_from_system() {
   # systemd user units we manage
   if [ -d "$HOME/.config/systemd/user" ]; then
     R --delete --include='prewarm-apps.*' --include='wl-clip-persist.*' --exclude='*' \
-       "$HOME/.config/systemd/user/"                          "$HERE/home/.config/systemd/user/"
+       "$HOME/.config/systemd/user/"  "$HERE/home/.config/systemd/user/"
   fi
 
   say "2/5  Single-file desktop configs"
@@ -117,15 +139,16 @@ pull_from_system() {
   for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile \
            hyprland-dialog hyprland-update-screen hyprland-guiutils \
            noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl \
-           sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh; do
+           sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers \
+           hypr-resume-handler.sh noctalia-switch; do
     if [ -f "$HOME/.local/bin/$s" ]; then
-      CP "$HOME/.local/bin/$s"                              "$HERE/home/.local/bin/$s"
+      CP "$HOME/.local/bin/$s"  "$HERE/home/.local/bin/$s"
     fi
   done
 
   for f in brave-browser.desktop org.gnome.Settings.desktop; do
     if [ -f "$HOME/.local/share/applications/$f" ]; then
-      CP "$HOME/.local/share/applications/$f"               "$HERE/home/.local/share/applications/$f"
+      CP "$HOME/.local/share/applications/$f"  "$HERE/home/.local/share/applications/$f"
     fi
   done
 
@@ -180,14 +203,14 @@ pull_from_system() {
             > "$HERE/patches/HyprlandService.qml.patch" || true
   fi
 
-  say "5/5  Done pulling desktop configs into dotfiles."
+  say "5/5  Done pulling desktop configs into dotfiles  [branch: $BRANCH | profile: $PROFILE_LABEL]"
 }
 
 # -----------------------------------------------------------------------------
 # Check Drift Logic
 # -----------------------------------------------------------------------------
 check_drift() {
-  echo -e "\n\033[1;36m=== Checking for Configuration Drifts ===\033[0m"
+  echo -e "\n\033[1;36m=== Checking for Configuration Drifts  [branch: $BRANCH | profile: $PROFILE_LABEL] ===\033[0m"
   local drift_found=0
 
   check_file() {
@@ -227,15 +250,17 @@ check_drift() {
     fi
   done
 
-  check_file "$HOME/.config/noctalia/settings.json" "$HERE/home/.config/noctalia/settings.json"
-  check_file "$HOME/.config/noctalia/plugins.json" "$HERE/home/.config/noctalia/plugins.json"
-  check_file "$HOME/.config/noctalia/colors.json" "$HERE/home/.config/noctalia/colors.json"
-  check_file "$HOME/.config/noctalia/manual-keybinds.json" "$HERE/home/.config/noctalia/manual-keybinds.json"
-  check_file "$HOME/.config/noctalia/terminal-commands.json" "$HERE/home/.config/noctalia/terminal-commands.json"
-  check_file "$HOME/.config/noctalia/user-keybinds.json" "$HERE/home/.config/noctalia/user-keybinds.json"
-  check_file "$HOME/.config/noctalia/user-templates.toml" "$HERE/home/.config/noctalia/user-templates.toml"
-  check_dir "$HOME/.config/noctalia/plugins/" "$HERE/home/.config/noctalia/plugins/"
-  check_dir "$HOME/.config/noctalia/matugenTemplates/" "$HERE/home/.config/noctalia/matugenTemplates/"
+  # Noctalia — uses branch-specific paths
+  check_file "$NOCTALIA_LIVE/settings.json"         "$NOCTALIA_REPO/settings.json"
+  check_file "$NOCTALIA_LIVE/config.toml"           "$NOCTALIA_REPO/config.toml"
+  check_file "$NOCTALIA_LIVE/plugins.json"          "$NOCTALIA_REPO/plugins.json"
+  check_file "$NOCTALIA_LIVE/colors.json"           "$NOCTALIA_REPO/colors.json"
+  check_file "$NOCTALIA_LIVE/manual-keybinds.json"  "$NOCTALIA_REPO/manual-keybinds.json"
+  check_file "$NOCTALIA_LIVE/terminal-commands.json" "$NOCTALIA_REPO/terminal-commands.json"
+  check_file "$NOCTALIA_LIVE/user-keybinds.json"   "$NOCTALIA_REPO/user-keybinds.json"
+  check_file "$NOCTALIA_LIVE/user-templates.toml"  "$NOCTALIA_REPO/user-templates.toml"
+  check_dir  "$NOCTALIA_LIVE/plugins/"             "$NOCTALIA_REPO/plugins/"
+  check_dir  "$NOCTALIA_LIVE/matugenTemplates/"    "$NOCTALIA_REPO/matugenTemplates/"
 
   # Home files
   for f in .bashrc .blerc .config/atuin/config.toml .config/gtk-3.0/settings.ini .config/gtk-4.0/settings.ini .config/kdeglobals .config/fontconfig/fonts.conf .config/autostart/noctalia-session-cleanup.desktop; do
@@ -243,7 +268,7 @@ check_drift() {
   done
 
   # Helpers & overrides
-  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh; do
+  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh noctalia-switch; do
     check_file "$HOME/.local/bin/$s" "$HERE/home/.local/bin/$s"
   done
 
@@ -283,7 +308,7 @@ check_drift() {
 # View Diffs Logic
 # -----------------------------------------------------------------------------
 view_diffs() {
-  echo -e "\n\033[1;36m=== Showing Configuration Differences ===\033[0m"
+  echo -e "\n\033[1;36m=== Showing Configuration Differences  [branch: $BRANCH | profile: $PROFILE_LABEL] ===\033[0m"
   local count=0
 
   diff_file() {
@@ -302,18 +327,19 @@ view_diffs() {
   done
 
   # Helpers
-  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh; do
+  for s in charge-limit wallcards-video prewarm-apps toggle-fan-profile hyprland-dialog hyprland-update-screen hyprland-guiutils noctalia-session-cleanup restore-power-profile update-sddm-wallpaper waybarctl sysupdate sysfind nvrun sys-stats-period wallpaper-fetch fetch-wallpapers hypr-resume-handler.sh noctalia-switch; do
     diff_file "$HOME/.local/bin/$s" "$HERE/home/.local/bin/$s"
   done
 
-  # Noctalia / hyprland critical files
-  diff_file "$HOME/.config/noctalia/settings.json" "$HERE/home/.config/noctalia/settings.json"
-  diff_file "$HOME/.config/noctalia/plugins.json" "$HERE/home/.config/noctalia/plugins.json"
-  diff_file "$HOME/.config/noctalia/colors.json" "$HERE/home/.config/noctalia/colors.json"
-  diff_file "$HOME/.config/noctalia/manual-keybinds.json" "$HERE/home/.config/noctalia/manual-keybinds.json"
-  diff_file "$HOME/.config/noctalia/terminal-commands.json" "$HERE/home/.config/noctalia/terminal-commands.json"
-  diff_file "$HOME/.config/noctalia/user-keybinds.json" "$HERE/home/.config/noctalia/user-keybinds.json"
-  diff_file "$HOME/.config/noctalia/user-templates.toml" "$HERE/home/.config/noctalia/user-templates.toml"
+  # Noctalia — branch-aware paths
+  diff_file "$NOCTALIA_LIVE/settings.json"          "$NOCTALIA_REPO/settings.json"
+  diff_file "$NOCTALIA_LIVE/config.toml"            "$NOCTALIA_REPO/config.toml"
+  diff_file "$NOCTALIA_LIVE/plugins.json"           "$NOCTALIA_REPO/plugins.json"
+  diff_file "$NOCTALIA_LIVE/colors.json"            "$NOCTALIA_REPO/colors.json"
+  diff_file "$NOCTALIA_LIVE/manual-keybinds.json"   "$NOCTALIA_REPO/manual-keybinds.json"
+  diff_file "$NOCTALIA_LIVE/terminal-commands.json" "$NOCTALIA_REPO/terminal-commands.json"
+  diff_file "$NOCTALIA_LIVE/user-keybinds.json"    "$NOCTALIA_REPO/user-keybinds.json"
+  diff_file "$NOCTALIA_LIVE/user-templates.toml"   "$NOCTALIA_REPO/user-templates.toml"
 
   # System files
   diff_file /etc/systemd/system/libfprint-custom.service "$HERE/system/etc/systemd/system/libfprint-custom.service"
@@ -338,7 +364,7 @@ scan_untracked() {
     if [ -d "$dir" ]; then
       local base=$(basename "$dir")
       case "$base" in
-        hypr|kitty|fastfetch|xdg-desktop-portal|noctalia|quickshell|systemd|atuin|gtk-3.0|gtk-4.0|kdeglobals|fontconfig|autostart|vesktop|Vencord|*) ;;
+        hypr|kitty|fastfetch|xdg-desktop-portal|noctalia|noctalia-v4|quickshell|systemd|atuin|gtk-3.0|gtk-4.0|kdeglobals|fontconfig|autostart|vesktop|Vencord|*) ;;
       esac
     fi
   done
@@ -375,32 +401,30 @@ setup_stow() {
   echo -e "\033[1;32m✔ GNU Stow symlinks successfully established!\033[0m"
 }
 
-
-
 # -----------------------------------------------------------------------------
-# Git commit/push
+# Git commit/push — pushes to the current branch
 # -----------------------------------------------------------------------------
 git_push() {
-  echo -e "\n\033[1;36m=== Committing & Pushing to GitHub ===\033[0m"
+  echo -e "\n\033[1;36m=== Committing & Pushing to GitHub  [branch: $BRANCH] ===\033[0m"
   cd "$HERE"
   git status --short
-  
+
   if git diff --quiet && git diff --cached --quiet; then
     echo "Nothing to commit."
     return 0
   fi
-  
+
   read -p "Enter commit message: " msg
   if [ -z "$msg" ]; then
     echo "Commit message cannot be empty. Aborted."
     return 1
   fi
-  
+
   git add -A
   git commit -m "$msg"
-  echo "Pushing to GitHub..."
-  git push
-  echo -e "\033[1;32m✔ Changes pushed successfully!\033[0m"
+  echo "Pushing to GitHub (branch: $BRANCH)..."
+  git push origin "$BRANCH"
+  echo -e "\033[1;32m✔ Changes pushed successfully to $BRANCH!\033[0m"
 }
 
 # -----------------------------------------------------------------------------
@@ -409,17 +433,17 @@ git_push() {
 # If arguments are passed, run legacy CLI mode
 if [ -n "${COMMIT_MSG}" ] || [ "${DRYRUN}" = 1 ]; then
   pull_from_system
-  
+
   cd "$HERE"
   git status --short
-  
+
   if [ -n "$COMMIT_MSG" ] && [ "$DRYRUN" != 1 ]; then
     if git diff --quiet && git diff --cached --quiet; then
       echo "Nothing to commit."
     else
       git add -A
       git commit -m "$COMMIT_MSG"
-      echo "Committed. Push with:  git push"
+      echo "Committed. Push with:  git push origin $BRANCH"
     fi
   fi
   exit 0
@@ -433,6 +457,8 @@ while true; do
   echo "    🚀 DOTFILES INTERACTIVE MANAGEMENT DASHBOARD     "
   echo "====================================================="
   echo -e "\033[0m"
+  echo -e "  \033[1;36mBranch:\033[0m $BRANCH  \033[1;36m|\033[0m  \033[1;36mProfile:\033[0m $PROFILE_LABEL"
+  echo ""
   echo -e "  \033[1;33m[1]\033[0m Check Drift Status (System vs Repo)"
   echo -e "  \033[1;33m[2]\033[0m View Differences (diff)"
   echo -e "  \033[1;33m[3]\033[0m Scan for Untracked Configuration Files"
@@ -448,11 +474,11 @@ while true; do
     1) check_drift ;;
     2) view_diffs ;;
     3) scan_untracked ;;
-    4) 
+    4)
       echo -e "\n=== Restoring/Deploying Configs ==="
       ./install.sh
       ;;
-    5) 
+    5)
       echo -e "\n=== Syncing active system files to repo ==="
       pull_from_system
       ;;
