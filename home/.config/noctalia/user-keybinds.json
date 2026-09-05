@@ -10,5 +10,11 @@
     "desc": "Toggle Bluetooth Power",
     "explanation": "Executes rfkill to toggle power to the bluetooth controller.",
     "command": "exec rfkill toggle bluetooth"
+  },
+  {
+    "keys": "Super + Alt + G",
+    "desc": "GPU Status & VRAM Monitor",
+    "explanation": "Opens a terminal displaying NVIDIA RTX 4050 health, temps, VRAM usage, and active processes.",
+    "command": "exec kitty sh -c '~/.local/bin/gpu-status; echo; read -p \"Press Enter to exit...\"'"
   }
 ]

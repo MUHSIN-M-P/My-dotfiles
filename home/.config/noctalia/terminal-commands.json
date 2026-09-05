@@ -94,5 +94,47 @@
     "desc": "Check Disk Space Usage (df)",
     "explanation": "Displays disk space utilization for all mounted filesystems.",
     "command": "kitty sh -c 'df -h; echo; read -p \"Press Enter to exit...\"'"
+  },
+  {
+    "keys": "gpu-status",
+    "desc": "GPU Status & VRAM Monitor",
+    "explanation": "Displays NVIDIA GeForce RTX 4050 health, driver version, temps, VRAM usage, and active processes.",
+    "command": "kitty sh -c '~/.local/bin/gpu-status; echo; read -p \"Press Enter to exit...\"'"
+  },
+  {
+    "keys": "prime-run blender",
+    "desc": "Launch Blender on RTX 4050 GPU",
+    "explanation": "Launches Blender with NVIDIA PRIME GPU offloading for fast CUDA Cycles and EEVEE rendering.",
+    "command": "prime-run blender"
+  },
+  {
+    "keys": "nvidia-smi",
+    "desc": "NVIDIA System Management Interface",
+    "explanation": "Monitors real-time NVIDIA GPU clock speeds, power draw, temperature, and process allocations.",
+    "command": "kitty sh -c 'nvidia-smi; echo; read -p \"Press Enter to exit...\"'"
+  },
+  {
+    "keys": "gpu-hybrid",
+    "desc": "Switch GPU: Hybrid Mode (Default)",
+    "explanation": "Sets GPU to Hybrid Optimus mode (Intel for display, NVIDIA for heavy 3D/AI). Reboot required.",
+    "command": "kitty sh -c 'pkexec envycontrol --switch hybrid && echo \"Set to HYBRID mode — please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
+  },
+  {
+    "keys": "gpu-nvidia",
+    "desc": "Switch GPU: Dedicated NVIDIA Mode",
+    "explanation": "Sets GPU to Dedicated NVIDIA-only mode for maximum performance in all apps. Reboot required.",
+    "command": "kitty sh -c 'pkexec envycontrol --switch nvidia && echo \"Set to NVIDIA-only mode — please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
+  },
+  {
+    "keys": "gpu-intel",
+    "desc": "Switch GPU: Integrated Intel Mode",
+    "explanation": "Disables NVIDIA GPU to run exclusively on Intel UHD Graphics for maximum battery life. Reboot required.",
+    "command": "kitty sh -c 'pkexec envycontrol --switch integrated && echo \"Set to INTEGRATED mode — please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
+  },
+  {
+    "keys": "cuda-test",
+    "desc": "Test CUDA / PyTorch GPU Acceleration",
+    "explanation": "Runs a quick Python test to verify PyTorch detects CUDA and the NVIDIA GeForce RTX 4050.",
+    "command": "kitty sh -c 'python3 -c \"import torch; print(\\\"CUDA Available:\\\", torch.cuda.is_available()); print(\\\"GPU Device:\\\", torch.cuda.get_device_name(0) if torch.cuda.is_available() else \\\"N/A\\\")\" 2>/dev/null || echo \"PyTorch not found in current environment\"; echo; read -p \"Press Enter to exit...\"'"
   }
 ]
