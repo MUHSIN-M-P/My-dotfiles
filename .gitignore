@@ -5,6 +5,9 @@ home/.config/atuin/history.db
 home/.config/atuin/key
 home/.config/noctalia/pinned_clipboard.json
 home/.config/noctalia/shell.log
+home/.config/noctalia/.profile_version
+# v4 config dir only belongs on the noctalia-v4 branch — exclude from main
+home/.config/noctalia-v4/
 
 # Quickshell runtime sockets / logs / cache
 home/.config/quickshell/**/by-id/
