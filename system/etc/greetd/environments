@@ -1,0 +1,3 @@
+# One command per line. These appear in gtkgreet's session chooser.
+/usr/local/bin/session-hyprland
+/usr/local/bin/session-gnome-wayland

@@ -9,7 +9,7 @@ ui_scale              = 1.0
 high_contrast         = false
 
 [shell]
-corner_radius_scale   = 1.0          # 0 = square, 1 = default, 2 = extra rounded
+corner_radius_scale   = 1.1          # 0 = square, 1 = default, 2 = extra rounded
 font_family           = "Montserrat"
 time_format           = "{:%I:%M %p}"  # 12-hour format with AM/PM matching v4
 date_format           = "%A, %d %B"    # date format matching v4
@@ -17,7 +17,7 @@ offline_mode          = false        # block all outgoing HTTP when true
 # panel_anchor_bar   = "main"        # bar panels attach to without a source bar; omit = first enabled bar
 telemetry_enabled     = false        # send an anonymous startup ping
 niri_overview_type_to_launch_enabled = false # opt in to type-to-launch from niri overview
-polkit_agent          = false
+polkit_agent          = true
 password_style        = "default"    # default | random
 settings_show_advanced = true        # show advanced settings by default in Settings
 # settings_window_translucent = false  # translucent settings window background
@@ -25,7 +25,7 @@ show_location         = true         # hide weather location text in shell UI wh
 # app_icon_colorize   = false        # recolor application icons across the shell
 # app_icon_color      = "on_surface" # ColorSpec role or #hex when colorize is enabled
 clipboard_enabled     = true         # false disables clipboard panel, history, and compositor clipboard hooks
-clipboard_history_max_entries = 100 # unpinned history cap (10–10000); pinned entries are extra
+clipboard_history_max_entries = 40 # unpinned history cap (10–10000); pinned entries are extra
 clipboard_keep_from_closed_apps = true # keep the last copied item pasteable after the app you copied it from closes
 clipboard_auto_paste  = "auto"       # off | auto | ctrl_v | ctrl_shift_v | shift_insert
 clipboard_image_action_command = ""  # image preview action: gimp {path}, or satty -f - via stdin
@@ -50,13 +50,14 @@ alpha     = 0.55                    # multiplied by each component's background 
 transparency_mode     = "glass"     # solid | soft | glass; controls floating-panel opacity and card translucency
 borders               = true        # panel shell outline and in-panel section cards
 shadow                = true        # cast the global [shell.shadow] from panel surfaces
-launcher_placement       = "attached" # attached | floating
-clipboard_placement      = "attached" # attached | floating
+launcher_placement       = "floating" # attached | floating
+clipboard_placement      = "floating" # attached | floating
 control_center_placement = "attached" # attached | floating
 wallpaper_placement      = "attached" # attached | floating
-session_placement        = "attached" # attached | floating
+session_placement        = "floating" # attached | floating
 launcher_position        = "center"   # auto | center | top_left | … (floating only)
 clipboard_position       = "center"   # auto | center | top_left | … (floating only)
+list_item_background     = false      # Draw a rounded card background behind each launcher item
 open_near_click_control_center = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_launcher       = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_clipboard      = false # for attached/floating placement, follow the bar click instead of bar-center
@@ -66,9 +67,10 @@ open_near_click_session        = false # for attached/floating placement, follow
 [shell.launcher]
 categories    = true                    # show category filters in the launcher
 show_icons    = true                    # show application icons in launcher results
-show_app_origin_indicator = true        # show package origin indicators on application results
+show_app_origin_indicator = false       # hide package origin indicators on application results
 compact       = false                   # use smaller icons and tighter result rows
-app_grid      = false                   # show app icon grid view when results are apps only
+app_grid      = true                    # show app icon grid view when results are apps only
+show_app_actions = true                 # show application actions
 sort_by_usage = true                    # sort apps by usage frequency
 pinned        = []                      # e.g. ["firefox", "code", "kitty"] (launcher only)
 fetch_exchange_rates = true             # refresh currency rates from third-party sources
@@ -150,12 +152,16 @@ output_path = "/home/ldzbeta/.config/gtk-4.0/gtk.css"
 input_path  = "/home/ldzbeta/.config/noctalia/matugenTemplates/hyprland.conf"
 output_path = "/home/ldzbeta/.config/hypr/noctalia/noctalia-overrides.conf"
 
+[theme.templates.user.hyprlock]
+input_path  = "/home/ldzbeta/.config/noctalia/matugenTemplates/hyprlock.conf"
+output_path = "/home/ldzbeta/.config/hypr/hyprlock.conf"
+
 # ── Backdrop ──────────────────────────────────────────────────────────────────
 
 [backdrop]
-enabled                = false
-blur_intensity         = 0.5        # 0.0 = no blur, 1.0 = maximum
-tint_intensity         = 0.3        # 0.0 = no tint, 1.0 = opaque
+enabled                = true
+blur_intensity         = 0.85       # 0.0 = no blur, 1.0 = maximum
+tint_intensity         = 0.18       # 0.0 = no tint, 1.0 = opaque
 
 # ── Notifications ─────────────────────────────────────────────────────────────
 
@@ -165,7 +171,7 @@ show_app_name      = true
 show_actions       = true           # show action buttons; when false, clicking a toast triggers its default action
 layer              = "top"          # top | overlay
 scale              = 1.0            # notification size multiplier applied on top of accessibility.ui_scale
-background_opacity = 0.97
+background_opacity = 0.85
 offset_x           = 20             # absolute horizontal margin from the screen edge
 offset_y           = 8              # absolute vertical margin from the screen edge
 # [notification.filter.rhythmbox]
@@ -188,7 +194,7 @@ position = "top_right"              # top_right | top_left | top_center | bottom
 position_vertical = "top_center"    # same options; used when orientation = "vertical"
 orientation = "horizontal"          # horizontal | vertical (volume/brightness sliders only; text popups stay horizontal)
 scale = 1.0                         # OSD size multiplier applied on top of accessibility.ui_scale
-background_opacity = 0.97           # background opacity of OSD popups
+background_opacity = 0.85           # background opacity of OSD popups
 offset_x = 20                       # absolute horizontal margin from the screen edge
 offset_y = 8                        # absolute vertical margin from the screen edge
 # monitors = ["DP-1"]               # connector names; omit or leave empty for all monitors
@@ -211,8 +217,8 @@ privacy = true                      # microphone/camera/screen-share capture cha
 # ── Lock Screen ───────────────────────────────────────────────────────────────
 
 [lockscreen]
-enabled                 = true
-blurred_desktop         = false       # use a desktop snapshot as the lock screen background (requires wlr-screencopy)
+enabled                 = false        # disabled in favor of hyprlock
+blurred_desktop         = true        # use a desktop snapshot as the lock screen background (requires wlr-screencopy)
 blur_intensity          = 0.5         # lock screen background blur (0.0 = none, 1.0 = maximum)
 tint_intensity          = 0.3         # surface-color tint over the lock screen background
 # wallpaper             = ""          # optional image path for the lock screen; empty uses the desktop wallpaper
@@ -334,8 +340,8 @@ delete   = ["del"]
 [bar.main]
 position           = "top"          # top | bottom | left | right
 thickness          = 34
-background_opacity = 1.0
-radius             = 12
+background_opacity = 0.80
+radius             = 16
 margin_ends        = 180
 margin_edge        = 10
 padding            = 14
@@ -347,10 +353,10 @@ auto_hide          = false
 # smart_auto_hide    = false       # show when the active workspace is empty; hide when it has windows
 # show_on_workspace_switch = true   # with auto_hide: briefly reveal when the active workspace changes
 reserve_space      = true
-capsule            = false
-# capsule_fill     = "surface_variant"
-# capsule_radius   = 8.0            # omit/blank in Settings for automatic pill radius; 0.0 = square
-# capsule_opacity  = 1.0
+capsule            = true
+capsule_fill       = "surface_variant"
+capsule_radius     = 12.0
+capsule_opacity    = 0.85
 # capsule_border   = "outline"      # uncomment for a border on all widgets
 
 start  = ["workspaces", "sysmon"]
@@ -358,12 +364,12 @@ center = ["clock", "active_window"]
 end    = ["media", "lock_keys", "volume", "brightness", "notifications", "network", "bluetooth", "battery", "control-center"]
 
 # Commands for the bar margin outside widget sections (dead zone):
-# [bar.main.dead_zone.actions]
-# left = "panel-toggle launcher"
-# right = "panel-toggle control-center"
-# middle = "none"
-# scroll_up = "none"
-# scroll_down = "none"
+[bar.main.dead_zone.actions]
+left = "panel-toggle launcher"
+right = "panel-toggle control-center"
+middle = "none"
+scroll_up = "none"
+scroll_down = "none"
 
 # Per-monitor override example; only the fields you list are overridden:
 # [bar.main.monitor.dp1]
@@ -378,4 +384,173 @@ end    = ["media", "lock_keys", "volume", "brightness", "notifications", "networ
 enabled             = true          # set true to activate
 position            = "bottom"      # top | bottom | left | right
 icon_size           = 48
+main_axis_padding   = 16
+cross_axis_padding  = 8
+item_spacing        = 8
+background_opacity  = 0.80
+radius              = 18
+radius_top_left     = 18
+radius_top_right    = 18
+radius_bottom_left  = 18
+radius_bottom_right = 18
+margin_ends         = 0
+margin_edge         = 8
+shadow              = true
+show_running        = true
+auto_hide           = true
+# smart_auto_hide   = false       # show when the active workspace is empty; hide when it has windows
+reserve_space       = false
+layer               = "top"         # top | overlay
+active_scale        = 1.0
+inactive_scale      = 0.85
+magnification       = true
+magnification_scale = 1.45
+active_opacity      = 1.0
+inactive_opacity    = 0.85
+show_dots           = false
+show_instance_count = true
+launcher_position   = "start"       # none | start | end
+launcher_icon       = "grid-dots"  # Tabler glyph name
+active_monitor_only = false
+pinned              = []            # e.g. ["firefox", "code", "kitty"]
 
+# ── Desktop Widgets ───────────────────────────────────────────────────────────
+
+[desktop_widgets]
+enabled = false
+# When set, widget_order is the active widget list and stacking order.
+# widget_order = ["clock_main"]
+
+# [desktop_widgets.grid]
+# visible        = true
+# cell_size      = 16
+# major_interval        = 4
+# center_guides_visible = false
+# snap_to_center        = true
+
+# [desktop_widgets.widget.clock_main]
+# type     = "clock"
+# output   = "DP-1"
+# cx       = 960.0
+# cy       = 540.0
+# scale    = 1.5
+# rotation = 0.0
+
+# [desktop_widgets.widget.clock_main.settings]
+# format = "{:%H:%M}"
+# background_opacity = 0.8
+
+# [lockscreen_widgets]
+# enabled = false
+# widget_order = ["clock_main"]
+
+# [lockscreen_widgets.widget.clock_main]
+# type     = "clock"
+# output   = "DP-1"
+# cx       = 1600.0
+# cy       = 120.0
+# scale    = 1.5
+# rotation = 0.0
+
+# [lockscreen_widgets.widget.clock_main.settings]
+# format = "{:%H:%M}"
+# background_opacity = 0.8
+
+# ── Control Center ────────────────────────────────────────────────────────────
+
+# Shortcut buttons shown on the right side of the dashboard (up to 6).
+# [[control_center.shortcuts]]
+# type = "wifi"
+# [[control_center.shortcuts]]
+# type = "bluetooth"
+# [[control_center.shortcuts]]
+# type = "nightlight"
+# [[control_center.shortcuts]]
+# type = "notification"
+# [[control_center.shortcuts]]
+# type = "wallpaper"
+# [[control_center.shortcuts]]
+# type = "screen_recorder"
+# [[control_center.shortcuts]]
+# type = "session"
+
+# ── Hooks ─────────────────────────────────────────────────────────────────────
+
+[hooks]
+
+started = "bash /home/ldzbeta/.local/bin/noctalia-startup-manager"
+
+wallpaper_changed = "bash -c 'python3 /home/ldzbeta/.config/hypr/scripts/sync-screenshot-theme.py > /dev/null 2>&1 || true; noctalia msg templates-apply > /dev/null 2>&1 || true'"
+
+# Auto-regenerate hyprlock colors whenever Noctalia theme changes
+colors_changed = "noctalia msg templates-apply"
+
+# Track lock/unlock events with exact-time security auditing
+session_locked = "echo $(/usr/bin/date +%s) lock >> $HOME/.local/state/sys-stats-lock.log"
+session_unlocked = "echo $(/usr/bin/date +%s) unlock >> $HOME/.local/state/sys-stats-lock.log"
+
+# Power state notifications
+power_profile_changed = "notify-send 'Power' \"Profile: $NOCTALIA_POWER_PROFILE\" >/dev/null 2>&1 || true"
+# [widget.launcher]
+# custom_image = "/path/to/image.png"
+# custom_image_colorize = false
+
+# [widget.control-center]
+# custom_image = "/path/to/image.png"
+# custom_image_colorize = false
+
+# [widget.notifications]
+# hide_when_no_unread = true
+
+# [widget.network_rx]
+# network_speed_unit = "mb"          # auto | kb | mb
+# network_speed_compact = true       # show "1.2M" instead of "1.2 MB/s"
+#
+# [widget.network_tx]
+# network_speed_unit = "mb"          # auto | kb | mb
+# network_speed_compact = true       # show "1.2M" instead of "1.2 MB/s"
+
+# [widget.network]
+# vpn_status     = "replace"         # replace | both | hidden
+# show_label     = true
+# show_vpn_label = false             # replace: replaces network label; both: adds VPN label
+
+# [widget.volume.effects_profile_glyphs]
+# eq_desktop = "device-speaker"
+
+# [widget.keyboard_layout]
+# display                 = "short"    # "short" (e.g. "DE") or "full" (full layout name)
+# show_icon               = true
+# show_label              = true
+# hide_when_single_layout = false      # hide the widget when only one layout is configured
+# cycle_command           = ""         # custom command to cycle layouts (empty = compositor backend)
+# [widget.keyboard_layout.custom_labels]  # override display labels by exact layout name
+# "German (Neo 2)"        = "Neo2"
+# "English (US)"          = "EN"
+
+# [widget.lock_button]
+# type                = "custom_button"
+# glyph               = "lock"
+# tooltip             = "Lock screen"
+# command             = "noctalia msg session lock"
+# right_command       = ""
+# middle_command      = ""
+# scroll_up_command   = ""
+# scroll_down_command = ""
+#
+# [widget.clock]
+# format = "{:%H:%M}\n{:%d/%m}"
+# vertical_format = "{:%H\n%M}"
+# tooltip_format = "{:%A, %B %d, %Y}"
+# scale = 1.0                         # multiplies the bar scale for this widget only
+# font_scale = 1.0                    # multiplies text size for this widget only
+# font_weight = 700
+# interactive = false                 # pass clicks/scrolls through to the bar and disable hover/tooltips
+
+[widget.active_window]
+type    = "active_window"
+display = "icon_only"
+
+[widget.lock_keys]
+type          = "lock_keys"
+hide_when_off = true

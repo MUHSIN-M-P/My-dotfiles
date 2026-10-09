@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+#  Noctalia · Professional Startup Manager
+#  Phase-based init: IPC wait → status check → state restore → background tasks
+# ─────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+LOG_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/noctalia-boot.log"
+LOCK_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/sys-stats-lock.log"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [STARTUP] $1" >> "$LOG_FILE"
+}
+
+wait_for_ipc() {
+    for i in {1..30}; do
+        if timeout 0.1 noctalia msg theme-mode-get >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    log "WARNING: Noctalia IPC not ready after 15s"
+    return 1
+}
+
+# ── Phase 1: IPC Readiness ──────────────────────────────────────────────────
+log "Phase 1: waiting for Noctalia IPC socket…"
+if wait_for_ipc; then
+    log "Phase 1: IPC ready"
+else
+    log "Phase 1: timeout, continuing"
+fi
+
+# ── Phase 2: System Status ──────────────────────────────────────────────────
+log "Phase 2: system status…"
+
+BATTERY_PERCENT=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -1 || echo "N/A")
+BATTERY_STATUS=$(cat /sys/class/power_supply/BAT*/status 2>/dev/null | head -1 || echo "N/A")
+
+NETWORK_STATE="Disconnected"
+if ip link show 2>/dev/null | grep -q "state UP"; then
+    NETWORK_STATE="Connected"
+fi
+
+BT_STATE="Off"
+if command -v bluetoothctl >/dev/null && bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then
+    BT_STATE="On"
+fi
+
+log "Phase 2: battery ${BATTERY_PERCENT}% (${BATTERY_STATUS}) | net ${NETWORK_STATE} | bt ${BT_STATE}"
+
+# ── Phase 3: State Restoration ───────────────────────────────────────────────
+log "Phase 3: restoring saved state…"
+
+if [[ -f "$HOME/.local/state/power-profile" ]]; then
+    PROF=$(cat "$HOME/.local/state/power-profile")
+    powerprofilesctl set "$PROF" 2>/dev/null || true
+    log "Phase 3: power profile → $PROF"
+fi
+
+if [[ -f "$HOME/.local/state/nightlight" ]]; then
+    if [[ "$(cat "$HOME/.local/state/nightlight")" = "on" ]]; then
+        noctalia msg nightlight-enable 2>/dev/null || true
+        log "Phase 3: night light → on"
+    fi
+fi
+
+# ── Phase 4: Background Tasks ────────────────────────────────────────────────
+log "Phase 4: spawning background tasks…"
+
+(sleep 8 && ~/.local/bin/restore-power-profile) &>/dev/null &
+log "Phase 4: power profile restore (t+8s)"
+
+# ── Phase 5: Startup Notification (once per day) ────────────────────────────
+log "Phase 5: startup notification…"
+
+TODAY=$(date +%Y-%m-%d)
+if [[ ! -f "$HOME/.local/state/last-boot" ]] || [[ "$(cat "$HOME/.local/state/last-boot")" != "$TODAY" ]]; then
+    GREETING=$($HOME/.local/bin/noctalia-greeting 2>/dev/null || echo "Welcome")
+    noctalia msg notification-show "Noctalia" "$GREETING" 2>/dev/null || true
+    echo "$TODAY" > "$HOME/.local/state/last-boot"
+    log "Phase 5: greeted once today"
+fi
+
+log "════════════════════════════════════════════"
+log "Startup complete"

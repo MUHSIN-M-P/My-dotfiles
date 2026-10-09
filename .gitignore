@@ -39,7 +39,9 @@ home/.config/gh/hosts.yml
 **/*.bak
 **/*.bak.*
 **/*.preinst.bak
+**/*.backup-*
 **/*~
+**/.Trash-*/
 
 # Editor noise & OS files
 .DS_Store

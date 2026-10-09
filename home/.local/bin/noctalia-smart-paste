@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# noctalia-smart-paste: Intelligently simulate paste keystrokes without leaving modifier keys stuck.
+
+MODE="${1:-text}"
+SLEEP_TIME="${2:-0.2}"
+
+# 1. Brief pause to ensure launcher window has closed and target window has regained focus
+if (( $(echo "$SLEEP_TIME > 0" | bc -l 2>/dev/null || echo 1) )); then
+    sleep "$SLEEP_TIME"
+fi
+
+# 2. Detect active window class from Hyprland
+IS_TERMINAL=0
+if [[ "$MODE" != "image" ]]; then
+    ACTIVE_JSON=$(hyprctl activewindow -j 2>/dev/null)
+    WIN_CLASS=$(echo "$ACTIVE_JSON" | jq -r '((.class // "") + " " + (.initialClass // "") + " " + (.title // ""))' 2>/dev/null | tr '[:upper:]' '[:lower:]')
+
+    case "$WIN_CLASS" in
+        *foot*|*kitty*|*alacritty*|*wezterm*|*terminal*|*konsole*|*xterm*|*ghostty*|*ptyxis*|*blackbox*|*urxvt*|*rxvt*|*terminator*|*tilix*|*contour*|*rio*)
+            IS_TERMINAL=1
+            ;;
+    esac
+fi
+
+# 3. Perform atomic keystroke simulation with explicit modifier release
+if [[ "$MODE" == "image" ]]; then
+    # Images are always pasted with Ctrl+V
+    wtype -M ctrl -k v -m ctrl 2>/dev/null || true
+elif [[ "$IS_TERMINAL" -eq 1 ]]; then
+    # Terminal text paste uses Ctrl+Shift+V
+    wtype -M ctrl -M shift -k v -m shift -m ctrl 2>/dev/null || true
+else
+    # Standard GUI applications use Ctrl+V
+    wtype -M ctrl -k v -m ctrl 2>/dev/null || true
+fi

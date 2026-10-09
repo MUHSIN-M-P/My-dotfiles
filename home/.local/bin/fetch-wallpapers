@@ -110,8 +110,8 @@ for ((i=1; i<=COUNT; i++)); do
 done
 
 # Refresh Noctalia wallpaper list
-if command -v qs &>/dev/null; then
-    qs -c noctalia-shell ipc call wallpaper refresh >/dev/null 2>&1 || true
+if command -v noctalia &>/dev/null; then
+    noctalia msg wallpaper-random >/dev/null 2>&1 || true
 fi
 
 if [[ "$downloaded" -gt 0 ]]; then

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Noctalia v5
+Comment=Hyprland with vanilla Noctalia v5 shell
+Exec=/home/ldzbeta/.local/bin/start-noctalia-v5
+Type=Application
+DesktopNames=Hyprland
+Keywords=tiling;wayland;compositor;

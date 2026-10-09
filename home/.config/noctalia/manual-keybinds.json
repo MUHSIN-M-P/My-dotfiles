@@ -250,5 +250,35 @@
     "desc": "Move Window Silently",
     "explanation": "Moves the active window to the selected workspace silently without changing focus.",
     "command": "movetoworkspacesilent"
+  },
+  {
+    "keys": "Super + F7",
+    "desc": "Display Mode Switcher",
+    "explanation": "Opens the display mode picker GUI to switch between Laptop Only, HDMI Only, Extended, or Mirror modes.",
+    "command": "hypr-display gui"
+  },
+  {
+    "keys": "Super + Shift + F5",
+    "desc": "Display: Laptop Only",
+    "explanation": "Disables HDMI and moves all windows to the laptop screen (eDP-1).",
+    "command": "hypr-display laptop"
+  },
+  {
+    "keys": "Super + Shift + F6",
+    "desc": "Display: Extended (Laptop | HDMI)",
+    "explanation": "Enables both screens side by side — laptop on the left, HDMI on the right.",
+    "command": "hypr-display extend"
+  },
+  {
+    "keys": "Super + Shift + F7",
+    "desc": "Display: Mirror",
+    "explanation": "HDMI mirrors the laptop screen exactly.",
+    "command": "hypr-display mirror"
+  },
+  {
+    "keys": "Super + Shift + F8",
+    "desc": "Display: HDMI Only",
+    "explanation": "Disables laptop screen and moves all windows to the HDMI monitor.",
+    "command": "hypr-display hdmi"
   }
 ]

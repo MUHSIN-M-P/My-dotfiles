@@ -41,8 +41,24 @@ __atuin_bind_up_arrow=false
 
 
 # Added by Antigravity CLI installer
-export PATH="/home/ldzbeta/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# opencode
+export PATH=$HOME/.opencode/bin:$PATH
+
+# ===== GPU / NVIDIA Optimus Aliases =====
+# Run any app on NVIDIA GPU: nvidia-run blender, nvidia-run ollama, etc.
+alias nvidia-run='prime-run'
+alias gpu-status='~/.local/bin/gpu-status'
+
+# Quick CUDA test
+alias cuda-test='python3 -c "import torch; print(\"CUDA available:\", torch.cuda.is_available()); print(\"GPU:\", torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\")" 2>/dev/null || echo "PyTorch not installed"'
+
+# GPU switching helpers (requires reboot)
+alias gpu-hybrid='pkexec envycontrol --switch hybrid && echo "Set to HYBRID mode — reboot required"'
+alias gpu-nvidia='pkexec envycontrol --switch nvidia && echo "Set to NVIDIA-only mode — reboot required"'
+alias gpu-intel='pkexec envycontrol --switch integrated && echo "Set to Intel-only mode — reboot required"'

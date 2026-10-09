@@ -1,0 +1,13 @@
+[Unit]
+Description=Hyprland sleep/resume handler (suspend logging + lock on sleep)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/hypr-resume-handler.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

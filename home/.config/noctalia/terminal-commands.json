@@ -117,19 +117,19 @@
     "keys": "gpu-hybrid",
     "desc": "Switch GPU: Hybrid Mode (Default)",
     "explanation": "Sets GPU to Hybrid Optimus mode (Intel for display, NVIDIA for heavy 3D/AI). Reboot required.",
-    "command": "kitty sh -c 'pkexec envycontrol --switch hybrid && echo \"Set to HYBRID mode — please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
+    "command": "kitty sh -c 'pkexec envycontrol --switch hybrid && echo \"Set to HYBRID mode \u2014 please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
   },
   {
     "keys": "gpu-nvidia",
     "desc": "Switch GPU: Dedicated NVIDIA Mode",
     "explanation": "Sets GPU to Dedicated NVIDIA-only mode for maximum performance in all apps. Reboot required.",
-    "command": "kitty sh -c 'pkexec envycontrol --switch nvidia && echo \"Set to NVIDIA-only mode — please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
+    "command": "kitty sh -c 'pkexec envycontrol --switch nvidia && echo \"Set to NVIDIA-only mode \u2014 please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
   },
   {
     "keys": "gpu-intel",
     "desc": "Switch GPU: Integrated Intel Mode",
     "explanation": "Disables NVIDIA GPU to run exclusively on Intel UHD Graphics for maximum battery life. Reboot required.",
-    "command": "kitty sh -c 'pkexec envycontrol --switch integrated && echo \"Set to INTEGRATED mode — please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
+    "command": "kitty sh -c 'pkexec envycontrol --switch integrated && echo \"Set to INTEGRATED mode \u2014 please reboot to apply.\"; echo; read -p \"Press Enter to exit...\"'"
   },
   {
     "keys": "cuda-test",

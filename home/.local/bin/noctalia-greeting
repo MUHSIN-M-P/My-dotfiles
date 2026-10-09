@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+#  Noctalia · Time-Based Greeting
+#  Returns a professional greeting based on time of day
+# ─────────────────────────────────────────────────────────────────────────────
+HOUR=$(date +%H)
+
+case "$HOUR" in
+    00|01|02|03|04|05) GREETING="Good night" ;;
+    06|07|08|09|10|11) GREETING="Good morning" ;;
+    12|13|14|15|16)    GREETING="Good afternoon" ;;
+    17|18|19|20)       GREETING="Good evening" ;;
+    *)                 GREETING="Good night" ;;
+esac
+
+if [[ -f "$HOME/.face" ]]; then
+    FULL=$(getent passwd "$USER" | cut -d: -f5 | cut -d, -f1)
+    if [[ -n "$FULL" ]]; then
+        GREETING="$GREETING, ${FULL%% *}"
+    fi
+fi
+
+echo "$GREETING"

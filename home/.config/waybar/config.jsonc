@@ -1,4 +1,6 @@
+[
 {
+    // ── Top bar — appears on all active monitors automatically ──
     "layer": "top",
     "position": "top",
     "height": 38,
@@ -33,7 +35,7 @@
             "3": "󰲤",
             "4": "󰲦",
             "5": "󰲨",
-            "default": ""
+            "default": ""
         },
         "persistent-workspaces": {
             "*": 5
@@ -53,13 +55,13 @@
     },
 
     "cpu": {
-        "format": " {usage}%",
+        "format": " {usage}%",
         "tooltip": true,
         "interval": 2
     },
 
     "memory": {
-        "format": " {percentage}%",
+        "format": " {percentage}%",
         "tooltip-format": "Used: {used:0.1f}G / {total:0.1f}G"
     },
 
@@ -95,3 +97,4 @@
         "spacing": 10
     }
 }
+]

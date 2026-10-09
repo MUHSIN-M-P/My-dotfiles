@@ -1312,15 +1312,15 @@ Item {
     }
   }
 
-  // Process to trigger auto-paste via wtype Ctrl+V
+  // Process to trigger auto-paste via noctalia-smart-paste
   Process {
     id: autoPasteProc
-    command: ["wtype", "-M", "ctrl", "v"]
+    command: ["/home/ldzbeta/.local/bin/noctalia-smart-paste", "text", "0"]
     running: false
     onExited: exitCode => {
       Logger.w("Clipper", "[DEBUG]: autoPasteProc exited with code: " + exitCode);
       if (exitCode !== 0) {
-        Logger.w("Clipper", "wtype auto-paste exited with code: " + exitCode);
+        Logger.w("Clipper", "smart-paste auto-paste exited with code: " + exitCode);
       }
     }
   }

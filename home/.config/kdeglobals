@@ -168,3 +168,6 @@ inactiveBackground=19,19,19
 inactiveBlend=198,198,198
 inactiveForeground=198,198,198
 
+
+[Icons]
+Theme=Papirus-Dark

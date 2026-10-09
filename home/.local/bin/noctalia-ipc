@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Noctalia IPC Dispatcher
+# Dispatches keybinds and actions directly to native Noctalia
+
+set -euo pipefail
+
+cmd="${1:-}"
+shift || true
+subcmd="${1:-}"
+shift || true
+
+case "$cmd" in
+    launcher)
+        case "$subcmd" in
+            toggle|"")
+                exec noctalia msg panel-toggle launcher
+                ;;
+            clipboard|clip)
+                exec noctalia msg panel-toggle clipboard
+                ;;
+            emoji|emo)
+                exec noctalia msg panel-toggle launcher /emo
+                ;;
+            *)
+                exec noctalia msg panel-toggle launcher "$subcmd" "$@"
+                ;;
+        esac
+        ;;
+    clipboard)
+        exec noctalia msg panel-toggle clipboard
+        ;;
+    lockScreen|lock)
+        pidof hyprlock >/dev/null || exec hyprlock
+        ;;
+    sessionMenu|session)
+        exec noctalia msg panel-toggle session
+        ;;
+    wallpaper)
+        exec noctalia msg panel-toggle wallpaper
+        ;;
+    bar)
+        exec noctalia msg bar-toggle
+        ;;
+    volume)
+        case "$subcmd" in
+            increase|up)
+                exec noctalia msg volume-up
+                ;;
+            decrease|down)
+                exec noctalia msg volume-down
+                ;;
+            muteOutput|mute)
+                exec noctalia msg volume-mute
+                ;;
+            *)
+                exec noctalia msg volume-up
+                ;;
+        esac
+        ;;
+    brightness)
+        case "$subcmd" in
+            increase|up)
+                exec noctalia msg brightness-up
+                ;;
+            decrease|down)
+                exec noctalia msg brightness-down
+                ;;
+            *)
+                exec noctalia msg brightness-up
+                ;;
+        esac
+        ;;
+    controlCenter|control-center)
+        exec noctalia msg panel-toggle control-center "$subcmd" "$@"
+        ;;
+    overview)
+        exec noctalia msg window-switcher toggle
+        ;;
+    *)
+        exec noctalia msg "$cmd" "$subcmd" "$@"
+        ;;
+esac

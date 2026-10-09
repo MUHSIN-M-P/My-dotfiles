@@ -1,8 +1,8 @@
 {
     "appLauncher": {
         "autoPasteClipboard": true,
-        "clipboardWatchImageCommand": "wl-paste --type image --watch cliphist store",
-        "clipboardWatchTextCommand": "wl-paste --type text --watch cliphist store",
+        "clipboardWatchImageCommand": "wl-paste --type image --watch cliphist --max-items 40 store",
+        "clipboardWatchTextCommand": "wl-paste --type text --watch cliphist --max-items 40 store",
         "clipboardWrapText": true,
         "customLaunchPrefix": "",
         "customLaunchPrefixEnabled": false,
@@ -17,12 +17,11 @@
         "iconMode": "native",
         "ignoreMouseInput": false,
         "overviewLayer": false,
-        "pinnedApps": [
-        ],
+        "pinnedApps": [],
         "position": "center",
         "screenshotAnnotationTool": "",
         "showCategories": true,
-        "showIconBackground": true,
+        "showIconBackground": false,
         "sortByMostUsed": true,
         "terminalCommand": "kitty -e",
         "viewMode": "grid"
@@ -52,13 +51,13 @@
         "density": "comfortable",
         "displayMode": "always_visible",
         "enableExclusionZoneInset": true,
-        "fontScale": 0.9,
+        "fontScale": 1,
         "frameRadius": 24,
         "frameThickness": 8,
         "hideOnOverview": false,
-        "marginHorizontal": 329,
+        "marginHorizontal": 284,
         "marginVertical": 4,
-        "middleClickAction": "settings",
+        "middleClickAction": "none",
         "middleClickCommand": "",
         "middleClickFollowMouse": false,
         "monitors": [
@@ -72,19 +71,18 @@
         "rightClickAction": "controlCenter",
         "rightClickCommand": "",
         "rightClickFollowMouse": true,
-        "screenOverrides": [
-        ],
+        "screenOverrides": [],
         "showCapsule": true,
         "showOnWorkspaceSwitch": true,
         "showOutline": false,
-        "useSeparateOpacity": true,
-        "widgetSpacing": 0,
+        "useSeparateOpacity": false,
+        "widgetSpacing": 6,
         "widgets": {
             "center": [
                 {
                     "clockColor": "none",
-                    "customFont": "Montserrat ExtraBold",
-                    "formatHorizontal": "h:mm AP",
+                    "customFont": "",
+                    "formatHorizontal": "HH:mm",
                     "formatVertical": "HH mm - dd MM",
                     "id": "Clock",
                     "tooltipFormat": "HH:mm ddd, MMM dd",
@@ -148,7 +146,7 @@
                 },
                 {
                     "colorName": "primary",
-                    "hideWhenIdle": false,
+                    "hideWhenIdle": true,
                     "id": "AudioVisualizer",
                     "width": 200
                 }
@@ -271,10 +269,9 @@
         }
     },
     "brightness": {
-        "backlightDeviceMappings": [
-        ],
+        "backlightDeviceMappings": [],
         "brightnessStep": 5,
-        "enableDdcSupport": false,
+        "enableDdcSupport": true,
         "enforceMinimum": true
     },
     "calendar": {
@@ -302,7 +299,7 @@
         "predefinedScheme": "Rose Pine",
         "schedulingMode": "off",
         "syncGsettings": true,
-        "useWallpaperColors": true
+        "useWallpaperColors": false
     },
     "controlCenter": {
         "cards": [
@@ -391,28 +388,6 @@
                     },
                     {
                         "defaultSettings": {
-                            "barCount": 32,
-                            "customHeight": 0,
-                            "customPrimaryColor": "#6750A4",
-                            "customSecondaryColor": "#625B71",
-                            "customWidth": 0,
-                            "direction": "up",
-                            "fadeWhenIdle": true,
-                            "fps": 60,
-                            "mode": "bars",
-                            "sensitivity": 1.5,
-                            "smoothing": 0.18,
-                            "useCustomColors": false,
-                            "useGradient": true
-                        },
-                        "id": "plugin:deskvis",
-                        "scale": 0.85,
-                        "showBackground": true,
-                        "x": 552,
-                        "y": 312
-                    },
-                    {
-                        "defaultSettings": {
                             "completedCount": 0,
                             "count": 0,
                             "current_page_id": 0,
@@ -433,8 +408,7 @@
                             },
                             "showBackground": true,
                             "showCompleted": true,
-                            "todos": [
-                            ],
+                            "todos": [],
                             "useCustomColors": false
                         },
                         "id": "plugin:todo",
@@ -456,9 +430,9 @@
         "colorizeIcons": true,
         "deadOpacity": 0.6,
         "displayMode": "auto_hide",
-        "dockType": "floating",
+        "dockType": "attached",
         "enabled": true,
-        "floatingRatio": 0.75,
+        "floatingRatio": 1,
         "groupApps": true,
         "groupClickAction": "cycle",
         "groupContextMenuMode": "extended",
@@ -471,17 +445,15 @@
         "launcherIconColor": "none",
         "launcherPosition": "start",
         "launcherUseDistroLogo": true,
-        "monitors": [
-        ],
+        "monitors": [],
         "onlySameOutput": true,
-        "pinnedApps": [
-        ],
+        "pinnedApps": [],
         "pinnedStatic": true,
         "position": "bottom",
         "showDockIndicator": false,
         "showLauncherIcon": true,
         "sitOnFrame": false,
-        "size": 2
+        "size": 1
     },
     "general": {
         "allowPanelsOnScreenWithoutBar": true,
@@ -491,14 +463,14 @@
         "autoStartAuth": true,
         "avatarImage": "/home/ldzbeta/.face",
         "boxRadiusRatio": 1,
-        "clockFormat": "hh\\nmm",
-        "clockStyle": "analog",
-        "compactLockScreen": true,
-        "dimmerOpacity": 0.35000000000000003,
+        "clockFormat": "HH\\nmm",
+        "clockStyle": "digital",
+        "compactLockScreen": false,
+        "dimmerOpacity": 0.4,
         "enableBlurBehind": true,
         "enableLockScreenCountdown": true,
-        "enableLockScreenMediaControls": false,
-        "enableLoginLoadingScreen": true,
+        "enableLockScreenMediaControls": true,
+        "enableLoginLoadingScreen": false,
         "enableShadows": true,
         "forceBlackScreenCorners": true,
         "iRadiusRatio": 1,
@@ -531,10 +503,9 @@
         "lockScreenAnimations": true,
         "lockScreenBlur": 1,
         "lockScreenCountdownDuration": 10000,
-        "lockScreenMonitors": [
-        ],
-        "lockScreenTint": 0,
-        "loginLoadingDuration": 1200,
+        "lockScreenMonitors": [],
+        "lockScreenTint": 0.25,
+        "loginLoadingDuration": 0,
         "passwordChars": true,
         "radiusRatio": 1,
         "reverseScroll": true,
@@ -543,7 +514,7 @@
         "shadowDirection": "center",
         "shadowOffsetX": 0,
         "shadowOffsetY": 0,
-        "showChangelogOnStartup": true,
+        "showChangelogOnStartup": false,
         "showHibernateOnLockScreen": false,
         "showScreenCorners": true,
         "showSessionButtonsOnLockScreen": true,
@@ -556,8 +527,8 @@
         "enabled": true,
         "performanceModeDisabled": "bash -c \"/home/ldzbeta/.config/hypr/scripts/util.sh gamemode-off\"",
         "performanceModeEnabled": "bash -c \"/home/ldzbeta/.config/hypr/scripts/util.sh gamemode-on\"",
-        "screenLock": "echo $(/usr/bin/date +%s) lock >> /home/ldzbeta/.local/state/sys-stats-lock.log",
-        "screenUnlock": "echo $(/usr/bin/date +%s) unlock >> /home/ldzbeta/.local/state/sys-stats-lock.log",
+        "screenLock": "echo $(/usr/bin/date +%s) lock >> $HOME/.local/state/sys-stats-lock.log",
+        "screenUnlock": "echo $(/usr/bin/date +%s) unlock >> $HOME/.local/state/sys-stats-lock.log",
         "session": "",
         "startup": "",
         "wallpaperChange": ""
@@ -565,16 +536,16 @@
     "idle": {
         "customCommands": "[]",
         "enabled": true,
-        "fadeDuration": 5,
+        "fadeDuration": 3,
         "lockCommand": "",
-        "lockTimeout": 660,
+        "lockTimeout": 300,
         "resumeLockCommand": "",
         "resumeScreenOffCommand": "",
         "resumeSuspendCommand": "",
         "screenOffCommand": "",
-        "screenOffTimeout": 600,
+        "screenOffTimeout": 360,
         "suspendCommand": "",
-        "suspendTimeout": 1800
+        "suspendTimeout": 900
     },
     "location": {
         "analogClockInCalendar": false,
@@ -613,7 +584,7 @@
     },
     "noctaliaPerformance": {
         "disableDesktopWidgets": false,
-        "disableWallpaper": true
+        "disableWallpaper": false
     },
     "notifications": {
         "backgroundOpacity": 0.7000000000000001,
@@ -627,8 +598,7 @@
         "enabled": true,
         "location": "top",
         "lowUrgencyDuration": 3,
-        "monitors": [
-        ],
+        "monitors": [],
         "normalUrgencyDuration": 4,
         "overlayLayer": true,
         "respectExpireTimeout": true,
@@ -657,8 +627,7 @@
             2
         ],
         "location": "top_right",
-        "monitors": [
-        ],
+        "monitors": [],
         "overlayLayer": true
     },
     "plugins": {
@@ -818,14 +787,14 @@
         "enableUserTheming": true
     },
     "ui": {
-        "boxBorderEnabled": false,
+        "boxBorderEnabled": true,
         "fontDefault": "Montserrat",
         "fontDefaultScale": 1,
         "fontFixed": "JetBrainsMono Nerd Font",
         "fontFixedScale": 1,
-        "panelBackgroundOpacity": 0.93,
+        "panelBackgroundOpacity": 0.45,
         "panelsAttachedToBar": true,
-        "scrollbarAlwaysVisible": true,
+        "scrollbarAlwaysVisible": false,
         "settingsPanelMode": "window",
         "settingsPanelSideBarCardStyle": false,
         "tooltipsEnabled": true,
@@ -836,14 +805,12 @@
         "directory": "/home/ldzbeta/Pictures/Wallpapers",
         "enableMultiMonitorDirectories": false,
         "enabled": true,
-        "favorites": [
-        ],
+        "favorites": [],
         "fillColor": "#000000",
         "fillMode": "crop",
         "hideWallpaperFilenames": false,
         "linkLightAndDarkWallpapers": true,
-        "monitorDirectories": [
-        ],
+        "monitorDirectories": [],
         "overviewBlur": 0.4,
         "overviewEnabled": true,
         "overviewTint": 0.6,

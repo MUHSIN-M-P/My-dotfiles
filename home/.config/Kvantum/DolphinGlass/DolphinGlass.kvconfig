@@ -1,0 +1,15 @@
+[%General]
+author=Custom
+comment=Dark glassy transparent theme for Dolphin on Hyprland
+composite=true
+menu_shadow_depth=6
+tooltip_shadow_depth=6
+scroll_width=8
+scroll_arrows=false
+transient_scrollbar=true
+popup_blurring=true
+reduce_window_opacity=12
+reduce_menu_opacity=10
+animate_states=true
+dark_titlebar=true
+opaque_colors=false

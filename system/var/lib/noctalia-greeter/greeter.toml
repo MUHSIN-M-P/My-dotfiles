@@ -1,0 +1,17 @@
+[appearance]
+scheme = "Synced"
+power_buttons_position = "bottom-right"
+scheme_selector_position = "top-right"
+
+[appearance.wallpaper]
+path = "/var/lib/noctalia-greeter/wallpaper.jpg"
+fill_mode = "crop"
+
+[clock]
+enabled = true
+position = "above-panel"
+time_format = "{:%H:%M}"
+date_format = "%A, %x"
+
+[session]
+default = "Noctalia v5"

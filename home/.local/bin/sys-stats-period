@@ -1,11 +1,674 @@
 #!/usr/bin/env python3
+"""
+sys-stats-period — System Usage & Network Dashboard
+
+Accurate period statistics that keep improving the longer the script is installed:
+  - Network Traffic Summary   (today / this month / highest ever daily)
+  - This Week Usage           (active hours, uptime, locked per day)
+  - System Session Analytics  (current session, today totals, peak day, lifetime uptime)
+
+Data sources (all optional, everything degrades gracefully):
+  vnstat    network totals            tuptime   boot/uptime history
+  /proc     uptime, live counters     lock log  active-time tracking
+
+The script maintains its own persistent history at
+  $SYS_STATS_HISTORY  >  $XDG_STATE_HOME/sys-stats-history.json
+recording daily network totals from the very first run — so "highest ever
+daily" and "today" stay correct even when vnstat hasn't flushed its database.
+"""
+
 import sys
 import os
 import json
 import re
 import subprocess
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dtime
+
+# ---------------------------------------------------------------- paths
+
+def state_dir():
+    return os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+
+def lock_log_path():
+    return os.environ.get("SYS_STATS_LOG") or os.path.join(state_dir(), "sys-stats-lock.log")
+
+def history_path():
+    return os.environ.get("SYS_STATS_HISTORY") or os.path.join(state_dir(), "sys-stats-history.json")
+
+# ---------------------------------------------------------------- small utils
+
+def which(cmd):
+    for path in os.environ.get("PATH", "").split(os.pathsep):
+        full = os.path.join(path, cmd)
+        if os.path.isfile(full) and os.access(full, os.X_OK):
+            return full
+    return None
+
+def format_bytes(n):
+    n = float(n)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if n < 1024.0 or unit == "TiB":
+            return f"{n:,.2f} {unit}" if unit != "B" else f"{int(n)} B"
+        n /= 1024.0
+    return f"{n:,.2f} PiB"
+
+def fmt_hm(seconds):
+    seconds = max(0, int(seconds))
+    h, m = seconds // 3600, (seconds % 3600) // 60
+    return f"{h}h {m:02d}m" if h else f"{m}m"
+
+def run(cmd, timeout=10):
+    """Run a command, return stdout text or None on any failure."""
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return res.stdout if res.returncode == 0 else None
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------- history db
+
+def load_history():
+    """Load persistent history; tolerate corruption by starting fresh."""
+    path = history_path()
+    hist = {"version": 2, "first_run": None, "interfaces": {}, "days": {}}
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and data.get("version") == 2:
+            hist["first_run"] = data.get("first_run")
+            hist["interfaces"] = data.get("interfaces", {}) or {}
+            hist["days"] = {
+                k: v for k, v in (data.get("days") or {}).items()
+                if isinstance(v, dict) and isinstance(v.get("total"), (int, float))
+            }
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass  # corrupt file -> fresh start, will be rewritten
+    if not hist["first_run"]:
+        hist["first_run"] = datetime.now().isoformat(timespec="seconds")
+    return hist
+
+def save_history(hist):
+    """Atomic write: tmp file + rename, so a crash never corrupts history."""
+    path = history_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(hist, f, indent=1, sort_keys=True)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+def day_key(dt=None):
+    return (dt or datetime.now()).strftime("%Y-%m-%d")
+
+def record_counter_delta(hist, iface, rx, tx):
+    """Accumulate live-counter deltas into today's bucket.
+
+    On first run, if the system booted today we treat the entire current
+    reading as "traffic so far today" so the number is meaningful immediately.
+    For older boots, we start the baseline at the current reading and let
+    deltas accumulate from the next run on.
+    """
+    entry = hist["interfaces"].get(iface)
+    if entry is None:
+        boot = boot_epoch()
+        midnight = int(datetime.combine(datetime.now().date(), dtime.min).timestamp())
+        if boot >= midnight:
+            entry = {"rx": 0, "tx": 0, "ts": 0}
+        else:
+            entry = {"rx": rx, "tx": tx, "ts": 0}
+    if rx >= entry["rx"] and tx >= entry["tx"]:
+        drx, dtx = rx - entry["rx"], tx - entry["tx"]
+        if drx + dtx > 0:
+            day = hist["days"].setdefault(day_key(), {"total": 0})
+            day["total"] = day.get("total", 0) + drx + dtx
+    hist["interfaces"][iface] = {"rx": rx, "tx": tx, "ts": int(datetime.now().timestamp())}
+
+def read_live_counters(iface):
+    base = f"/sys/class/net/{iface}/statistics"
+    try:
+        with open(f"{base}/rx_bytes") as f:
+            rx = int(f.read().strip())
+        with open(f"{base}/tx_bytes") as f:
+            tx = int(f.read().strip())
+        return rx, tx
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------- network stats
+
+def default_interface():
+    res = run(["ip", "route", "show", "default"])
+    if res:
+        parts = res.strip().split()
+        if "dev" in parts:
+            return parts[parts.index("dev") + 1]
+    # fallback: /proc/net/route default entry
+    try:
+        with open("/proc/net/route") as f:
+            for line in f.readlines()[1:]:
+                parts = line.split()
+                if len(parts) >= 2 and parts[1] == "00000000":
+                    return parts[0]
+    except Exception:
+        pass
+    return None
+
+def vnstat_interfaces():
+    res = run(["vnstat", "--json"])
+    if not res:
+        return []
+    try:
+        data = json.loads(res)
+        return [i.get("name") for i in data.get("interfaces", []) if i.get("name")]
+    except Exception:
+        return []
+
+def _vnstat_traffic(iface):
+    """Return the 'traffic' dict for iface (or first tracked) or None."""
+    res = run(["vnstat", "--json"])
+    if not res:
+        return None
+    try:
+        data = json.loads(res)
+    except Exception:
+        return None
+    ifaces = data.get("interfaces", [])
+    entry = next((i for i in ifaces if i.get("name") == iface), None) \
+        or (ifaces[0] if ifaces else None)
+    if not entry:
+        return None
+    return entry.get("traffic") or {}
+
+def vnstat_day_month_top(iface, today):
+    """Exact vnstat values: (today_total, month_total, top_day_total)."""
+    traffic = _vnstat_traffic(iface)
+    if traffic is None:
+        return None
+
+    today_total = None
+    for d in traffic.get("day", []) or []:
+        dt = d.get("date", {})
+        if (dt.get("year"), dt.get("month"), dt.get("day")) == \
+                (today.year, today.month, today.day):
+            today_total = d.get("rx", 0) + d.get("tx", 0)
+            break
+
+    month_total = None
+    for m in traffic.get("month", []) or []:
+        dt = m.get("date", {})
+        if (dt.get("year"), dt.get("month")) == (today.year, today.month):
+            month_total = m.get("rx", 0) + m.get("tx", 0)
+            break
+
+    top_total = None
+    tops = traffic.get("top", []) or []
+    if tops:
+        top_total = max(t.get("rx", 0) + t.get("tx", 0) for t in tops)
+
+    return today_total, month_total, top_total
+
+def vnstat_hours_today(iface, today):
+    """Sum today's hourly entries (vnstat --json h) — fresher than the day list."""
+    res = run(["vnstat", "--json", "h"])
+    if not res:
+        return None
+    try:
+        data = json.loads(res)
+    except Exception:
+        return None
+    ifaces = data.get("interfaces", [])
+    entry = next((i for i in ifaces if i.get("name") == iface), None) \
+        or (ifaces[0] if ifaces else None)
+    if not entry:
+        return None
+    total = 0
+    found = False
+    for h in entry.get("traffic", {}).get("hour", []) or []:
+        dt = h.get("date", {})
+        if (dt.get("year"), dt.get("month"), dt.get("day")) == \
+                (today.year, today.month, today.day):
+            total += h.get("rx", 0) + h.get("tx", 0)
+            found = True
+    return total if found else None
+
+def network_stats(iface, hist):
+    """Combine vnstat + own counter history into accurate period totals."""
+    now = datetime.now()
+    vn = vnstat_day_month_top(iface, now) if which("vnstat") else None
+
+    vn_today = vn[0] if vn and vn[0] is not None else None
+    if vn_today is None:
+        vn_today = vnstat_hours_today(iface, now)
+    counter_today = hist["days"].get(day_key(now), {}).get("total", 0)
+
+    cands = [c for c in (vn_today, counter_today) if c]
+    today_total = max(cands) if cands else 0
+
+    month_total = vn[1] if vn and vn[1] is not None else None
+    if month_total is None:
+        month_total = sum(
+            rec.get("total", 0) for k, rec in hist["days"].items()
+            if k.startswith(now.strftime("%Y-%m"))
+        )
+
+    cands2 = []
+    if vn and vn[2]:
+        cands2.append(vn[2])
+    cands2.extend(rec.get("total", 0) for rec in hist["days"].values())
+    cands2.append(today_total)
+    highest_total = max(cands2) if cands2 else 0
+
+    return {
+        "today": today_total,
+        "month": month_total,
+        "highest": highest_total,
+        "since": hist.get("first_run"),
+    }
+
+# ---------------------------------------------------------------- uptime history
+
+def parse_tuptime_summary(text):
+    parsed = {}
+    for line in text.splitlines():
+        line = line.strip()
+        m = re.match(r"Current uptime:\s+(.*?)\s+since\s+(.*)", line, re.I)
+        if m:
+            parsed["current_duration"] = m.group(1).strip()
+            parsed["current_date"] = m.group(2).strip()
+            continue
+        m = re.match(r"System startups:\s+(\d+)\s+since\s+(.*)", line, re.I)
+        if m:
+            parsed["startups_count"] = m.group(1)
+            parsed["startups_since"] = m.group(2).strip()
+            continue
+        m = re.match(r"System uptime:\s+(.*)", line, re.I)
+        if m:
+            parsed["system_uptime"] = m.group(1).strip()
+            continue
+        m = re.match(r"Average uptime:\s+(.*)", line, re.I)
+        if m:
+            parsed["average"] = m.group(1).strip()
+            continue
+        m = re.match(r"Longest uptime:\s+(.*?)\s+from\s+(.*)", line, re.I)
+        if m:
+            parsed["longest_duration"] = m.group(1).strip()
+            parsed["longest_date"] = m.group(2).strip()
+            continue
+        m = re.match(r"System life:\s+(.*)", line, re.I)
+        if m:
+            parsed["system_life"] = m.group(1).strip()
+            continue
+    return parsed
+
+def tuptime_summary():
+    res = run(["tuptime"])
+    return parse_tuptime_summary(res) if res else {}
+
+def tuptime_intervals(since_epoch, until_epoch):
+    """Boot sessions overlapping [since, until] as (start, end) epoch pairs.
+
+    One call covers the whole window (fast); callers clip per-day.
+    """
+    res = run(["tuptime", "--tsince", str(since_epoch),
+               "--tuntil", str(until_epoch), "-l", "-s"])
+    if res is None:
+        return None
+    intervals = []
+    current_start = None
+    for line in res.splitlines():
+        parts = line.strip().split()
+        if not parts:
+            continue
+        if parts[0] == "Startup:":
+            if "at" in parts:
+                idx = parts.index("at")
+                if idx + 1 < len(parts):
+                    try:
+                        current_start = int(parts[idx + 1])
+                    except ValueError:
+                        current_start = None
+            elif current_start is None:
+                # startup predates the window
+                current_start = since_epoch
+        elif parts[0] == "Uptime:" and len(parts) >= 2 and current_start is not None:
+            try:
+                uptime = int(parts[1])
+            except ValueError:
+                current_start = None
+                continue
+            intervals.append((current_start, current_start + uptime))
+            current_start = None
+    return intervals
+
+def proc_uptime():
+    try:
+        with open("/proc/uptime") as f:
+            return float(f.read().split()[0])
+    except Exception:
+        return 0.0
+
+def boot_epoch():
+    return int(datetime.now().timestamp() - proc_uptime())
+
+# ---------------------------------------------------------------- activity (lock log)
+
+def load_events():
+    events = []
+    try:
+        with open(lock_log_path()) as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2:
+                    try:
+                        ts = int(parts[0])
+                    except ValueError:
+                        continue
+                    evt = parts[1].lower()
+                    if evt in ("lock", "unlock", "suspend", "resume", "sleep", "wake"):
+                        events.append((ts, evt))
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    events.sort(key=lambda e: e[0])
+    return events
+
+def journal_sleep_spans(since, until, boot_sessions=None, timeout=15):
+    """Sleep spans from the systemd journal (authoritative sleep source).
+
+    The lock-log suspend/resume hooks miss events whenever the resume handler
+    is not running (it had no autostart unit for a long stretch), so sleep was
+    silently undercounted and "active" inflated — e.g. Sep 17 showed 19h43m
+    active for a day the machine mostly spent suspended.  The journal's
+    systemd-sleep markers survive handler outages, so use them as the primary
+    sleep source and union with the lock log.
+
+    A suspend marker with no matching resume (lost resume log, corrupted
+    journal segment) is closed at the first subsequent journal entry more than
+    ``SETTLE_SECS`` after the suspend — while suspended the kernel logs
+    nothing, so the next entry is the wake.  Entries within ``SETTLE_SECS``
+    are the suspend sequence itself (freeze/thaw messages).  Clock-skewed
+    lines (ts < start, seen after RTC jumps) are ignored.  A still-dangling
+    suspend at the end is dropped: this script runs while awake, so its true
+    end is unknown and counting it to "now" would swallow the week.
+    """
+    SETTLE_SECS = 120
+    if not which("journalctl"):
+        return []
+    try:
+        res = subprocess.run(
+            ["journalctl", "-o", "short-unix", "-t", "systemd-sleep",
+             "--no-pager", "--since", f"@{int(since)}",
+             "--until", f"@{int(until)}"],
+            capture_output=True, text=True, timeout=timeout)
+        lines = res.stdout.splitlines() if res.returncode == 0 else []
+    except Exception:
+        return []
+
+    starts_sorted = sorted({b_s for b_s, _ in (boot_sessions or [])})
+
+    def next_boot_start(ts):
+        for b_s in starts_sorted:
+            if b_s > ts:
+                return b_s
+        return None
+
+    def resolve_dangling(ts):
+        """Close a suspend with no resume: wake-inferred end, bounded by the
+        next boot start (sleep cannot survive past a reboot)."""
+        wake = _journal_wake_after(ts, until, settle=SETTLE_SECS,
+                                   timeout=timeout)
+        cands = [c for c in (wake, next_boot_start(ts))
+                 if c is not None and c > ts]
+        if not cands:
+            return None
+        return (ts, min(cands))
+
+    spans = []
+    start = None
+    for line in lines:
+        if line.startswith("-- Boot "):
+            # Journal boot boundary: a suspend NEVER pairs with a resume from
+            # a later journal boot (pairing them chained unrelated days into
+            # one mega-span and stole the later boot's own markers).  Resolve
+            # the dangling suspend within its own boot instead.
+            if start is not None:
+                r = resolve_dangling(start)
+                if r is not None:
+                    spans.append(r)
+                start = None
+            continue
+        parts = line.split(None, 1)
+        if not parts:
+            continue
+        try:
+            ts = int(float(parts[0]))
+        except ValueError:
+            continue
+        if ts < since - 86400 or ts > until + 3600:
+            continue  # clock-skewed / out-of-window line
+        msg = parts[1] if len(parts) > 1 else ""
+        if "Performing sleep operation" in msg:
+            if start is None:
+                start = ts
+        elif "returned from sleep operation" in msg and start is not None:
+            if ts > start:
+                spans.append((start, ts))
+            start = None
+    if start is not None:
+        r = resolve_dangling(start)
+        if r is not None:
+            spans.append(r)
+    if boot_sessions is not None:
+        capped = []
+        for s, e in spans:
+            c = _cap_span_at_boot(s, e, boot_sessions)
+            if c is not None:
+                capped.append(c)
+        spans = capped
+    return spans
+
+
+def _journal_wake_after(start, until, settle=120, timeout=15, max_lines=20000):
+    """First journal timestamp more than *settle* secs after *start*.
+
+    Streams the journal from *start* and stops at the first entry past the
+    settle window — the suspend sequence's own lines fall inside the window,
+    so the first line outside it is the wake.  Returns None when unknown.
+    """
+    try:
+        proc = subprocess.Popen(
+            ["journalctl", "-o", "short-unix", "--no-pager",
+             "--since", f"@{int(start)}", "--until", f"@{int(until)}"],
+            stdout=subprocess.PIPE, text=True)
+    except Exception:
+        return None
+    try:
+        count = 0
+        for line in proc.stdout:
+            count += 1
+            if count > max_lines:
+                break
+            parts = line.split(None, 1)
+            if not parts:
+                continue
+            try:
+                ts = int(float(parts[0]))
+            except ValueError:
+                continue
+            if ts < start:
+                continue  # skewed line from the suspend sequence
+            if ts > start + settle and ts <= until:
+                return ts
+        return None
+    except Exception:
+        return None
+    finally:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+def _cap_span_at_boot(s, e, boot_sessions):
+    """Cap a span at the end of the boot session containing its start.
+
+    A suspend/lock event belongs to the boot session it was recorded in.  An
+    event never closed by its matching counterpart (e.g. a suspend with no
+    resume logged after a crash / missed hook / BAD shutdown) must not extend
+    across later boots and swallow all awake time on subsequent days.
+
+    Returns None when the span cannot be attributed to any known boot session
+    (stale event predating tuptime history, clock skew with e < s, ...).
+    Callers must skip None spans instead of counting them uncapped — an
+    uncapped span is what repeatedly zeroed the whole week view.
+    """
+    if e < s:
+        return None
+    for b_s, b_e in boot_sessions:
+        if b_s <= s <= b_e:
+            return (s, min(e, b_e))
+    return None
+
+def merge_spans(spans):
+    """Union of (start, end) spans, merging overlaps and contiguity."""
+    clean = sorted((s, e) for s, e in spans if e > s)
+    out = []
+    for s, e in clean:
+        if out and s <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], e))
+        else:
+            out.append((s, e))
+    return out
+
+
+def log_sleep_spans(events, boot_sessions):
+    """Completed lock-log suspend->resume pairs, capped at boot sessions."""
+    spans = []
+    start = None
+    for ts, evt in events:
+        if evt in ("suspend", "sleep"):
+            if start is None:
+                start = ts
+        elif evt in ("resume", "wake") and start is not None:
+            capped = _cap_span_at_boot(start, ts, boot_sessions)
+            start = None
+            if capped is None:
+                continue
+            spans.append(capped)
+    # NOTE: a trailing suspend with no resume is deliberately NOT counted
+    # here.  This script runs while awake, so a dangling lock-log suspend
+    # means the resume hook was missed and its true end is unknown; the
+    # journal spans (authoritative) cover real sleep instead.  Counting the
+    # dangling span to "now" previously swallowed the entire week.
+    return spans
+
+
+def suspended_in(events, since, until, boot_sessions, journal_spans=None):
+    spans = merge_spans(
+        log_sleep_spans(events, boot_sessions) + list(journal_spans or []))
+    return sum(min(e, until) - max(s, since)
+               for s, e in spans if max(s, since) < min(e, until))
+
+def event_spans(events, starts, ends, until, boot_sessions,
+                include_dangling=True):
+    """Return spans opened by an event in *starts* and closed by *ends*."""
+    spans = []
+    start = None
+    for ts, evt in events:
+        if evt in starts:
+            if start is None:
+                start = ts
+        elif evt in ends and start is not None:
+            capped = _cap_span_at_boot(start, ts, boot_sessions)
+            start = None
+            if capped is None:
+                continue
+            spans.append(capped)
+    if start is not None and include_dangling:
+        capped = _cap_span_at_boot(start, until, boot_sessions)
+        if capped is not None:
+            spans.append(capped)
+    return spans
+
+def locked_in(events, intervals, since, until, boot_sessions,
+              journal_spans=None):
+    """Count locked *awake* time, not lock-to-unlock wall-clock time.
+
+    The lock hook runs immediately before suspend and the unlock hook runs
+    after resume.  Therefore a lock span can contain a suspend span; counting
+    it directly would classify sleeping time as locked and can consume all
+    awake time after the clamp in day_usage().
+    """
+    lock_spans = event_spans(events, {"lock"}, {"unlock"}, until, boot_sessions,
+                             include_dangling=True)
+    # Sleep subtracted here is the union of lock-log pairs and authoritative
+    # journal spans; dangling lock-log suspends stay excluded (unknown end).
+    sleep_spans = merge_spans(
+        [sp for sp in event_spans(events, {"suspend", "sleep"},
+                                  {"resume", "wake"}, until, boot_sessions,
+                                  include_dangling=False)]
+        + list(journal_spans or []))
+    total = 0
+    for sys_start, sys_end in intervals:
+        for lock_start, lock_end in lock_spans:
+            a = max(lock_start, sys_start, since)
+            b = min(lock_end, sys_end, until)
+            if a >= b:
+                continue
+            # Subtract sleep from each lock span; lock hooks intentionally
+            # surround suspend, so these ranges commonly overlap.
+            awake_locked = b - a
+            for sleep_start, sleep_end in sleep_spans:
+                awake_locked -= max(0, min(b, sleep_end) - max(a, sleep_start))
+            total += max(0, awake_locked)
+    return total
+
+def day_usage(intervals, events, since, until, cap_sessions=None,
+              journal_spans=None):
+    """(uptime, awake, locked, active) inside [since, until].
+
+    active = awake - locked = time the machine was powered and unlocked.
+    It is NOT keypress-level activity tracking: an unlocked but idle machine
+    counts as active.  Sleep (journal + lock log) is what keeps idle-suspended
+    hours out of this number.
+    """
+    clipped = []
+    for s, e in intervals:
+        a, b = max(s, since), min(e, until)
+        if a < b:
+            clipped.append((a, b))
+    up = sum(b - a for a, b in clipped)
+    # Capping must use full boot history, not just the clipped day/window
+    # intervals: otherwise a span starting before the window has no containing
+    # session and would previously have been counted uncapped.
+    caps = cap_sessions if cap_sessions is not None else intervals
+    susp = suspended_in(events, since, until, caps, journal_spans)
+    susp = min(susp, up)  # defense in depth: sleep can never exceed uptime
+    awake = max(0, up - susp)
+    locked = min(locked_in(events, clipped, since, until, caps,
+                           journal_spans), awake)
+    active = max(0, awake - locked)
+    return {"up": up, "awake": awake, "locked": locked, "active": active}
+
+def weekly_entries(intervals, events, days=7, cap_sessions=None,
+                   journal_spans=None):
+    today = datetime.now().date()
+    out = []
+    for i in range(days - 1, -1, -1):
+        day = today - timedelta(days=i)
+        s = int(datetime.combine(day, dtime.min).timestamp())
+        e = int(datetime.combine(day, dtime.max).timestamp())
+        stats = day_usage(intervals, events, s, e, cap_sessions, journal_spans)
+        out.append({"date": day, **stats})
+    return out
+
+# ---------------------------------------------------------------- rendering
 
 try:
     from rich.console import Console
@@ -17,499 +680,264 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
 
-def check_dependencies():
-    missing = []
-    for cmd in ["vnstat", "tuptime"]:
-        if not shutil_which(cmd):
-            missing.append(cmd)
-    return missing
-
-def shutil_which(cmd):
-    for path in os.environ.get("PATH", "").split(os.pathsep):
-        full_path = os.path.join(path, cmd)
-        if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
-            return full_path
-    return None
-
-def format_bytes(bytes_num):
-    for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB']:
-        if bytes_num < 1024.0:
-            return f"{bytes_num:.2f} {unit}"
-        bytes_num /= 1024.0
-    return f"{bytes_num:.2f} PiB"
-
-def get_default_interface():
-    try:
-        res = subprocess.run(["ip", "route", "show", "default"], capture_output=True, text=True, check=True)
-        lines = res.stdout.strip().split('\n')
-        if lines:
-            parts = lines[0].split()
-            if "dev" in parts:
-                idx = parts.index("dev")
-                if idx + 1 < len(parts):
-                    return parts[idx + 1]
-    except Exception:
-        pass
-    return None
-
-def get_vnstat_interfaces():
-    try:
-        res = subprocess.run(["vnstat", "--json"], capture_output=True, text=True)
-        if res.returncode == 0:
-            data = json.loads(res.stdout)
-            return [iface['name'] for iface in data.get('interfaces', [])]
-    except Exception:
-        pass
-    return []
-
-def get_vnstat_totals(interface):
-    """Extract Total Usage for Today, This Month, and Highest Ever Daily."""
-    try:
-        res = subprocess.run(["vnstat", "--json", "-i", interface], capture_output=True, text=True, check=True)
-        data = json.loads(res.stdout)
-        interfaces_data = data.get("interfaces", [])
-        if not interfaces_data:
-            return None
-        
-        iface_data = interfaces_data[0]
-        traffic = iface_data.get("traffic", {})
-        
-        today = datetime.now().date()
-        current_year = today.year
-        current_month = today.month
-        
-        today_total = 0
-        days_list = traffic.get("day", []) or traffic.get("days", [])
-        for d in days_list:
-            d_info = d.get("date", {})
-            if d_info.get("year") == current_year and d_info.get("month") == current_month and d_info.get("day") == today.day:
-                today_total = d.get("rx", 0) + d.get("tx", 0)
-                break
-                
-        month_total = 0
-        months_list = traffic.get("month", []) or traffic.get("months", [])
-        for m in months_list:
-            m_info = m.get("date", {})
-            if m_info.get("year") == current_year and m_info.get("month") == current_month:
-                month_total = m.get("rx", 0) + m.get("tx", 0)
-                break
-                
-        highest_total = 0
-        top_list = traffic.get("top", [])
-        if top_list:
-            top_item = max(top_list, key=lambda x: (x.get("rx", 0) + x.get("tx", 0)))
-            highest_total = top_item.get("rx", 0) + top_item.get("tx", 0)
-            
-        return {
-            "today": today_total,
-            "month": month_total,
-            "highest": highest_total
-        }
-    except Exception as e:
-        return f"Error running vnstat: {e}"
-
-def parse_tuptime_regex(output_str):
-    parsed = {}
-    for line in output_str.split('\n'):
-        line = line.strip()
-        if not line:
-            continue
-            
-        m_longest = re.match(r"Longest uptime:\s+(.*?)\s+from\s+(.*)", line, re.IGNORECASE)
-        if m_longest:
-            parsed["longest_duration"] = m_longest.group(1).strip()
-            parsed["longest_date"] = m_longest.group(2).strip()
-            continue
-
-        m_current = re.match(r"Current uptime:\s+(.*?)\s+since\s+(.*)", line, re.IGNORECASE)
-        if m_current:
-            parsed["current_duration"] = m_current.group(1).strip()
-            parsed["current_date"] = m_current.group(2).strip()
-            continue
-
-        m_startups = re.match(r"System startups:\s+(\d+)\s+since\s+(.*)", line, re.IGNORECASE)
-        if m_startups:
-            parsed["startups_count"] = m_startups.group(1).strip()
-            parsed["startups_since"] = m_startups.group(2).strip()
-            continue
-
-        m_shutdowns = re.match(r"System shutdowns:\s+(.*)", line, re.IGNORECASE)
-        if m_shutdowns:
-            parsed["shutdowns"] = m_shutdowns.group(1).strip()
-            continue
-
-        m_avg = re.match(r"Average uptime:\s+(.*)", line, re.IGNORECASE)
-        if m_avg:
-            parsed["average"] = m_avg.group(1).strip()
-            continue
-
-        m_uptime = re.match(r"System uptime:\s+([\d\.]+%\s+=\s+.*)", line, re.IGNORECASE)
-        if m_uptime:
-            parsed["system_uptime"] = m_uptime.group(1).strip()
-            pct_match = re.search(r"([\d\.]+)%", line)
-            if pct_match:
-                parsed["system_uptime_pct"] = float(pct_match.group(1))
-            continue
-            
-    return parsed
-
-def format_short_dt(dt_str):
-    try:
-        dt = datetime.strptime(dt_str, "%m/%d/%Y %I:%M:%S %p")
-        today = datetime.now().date()
-        if dt.date() == today:
-            return dt.strftime("%I:%M %p")
-        else:
-            return dt.strftime("%b %d")
-    except Exception:
-        return dt_str
-
-def get_system_intervals(since_epoch, until_epoch):
-    cmd = ["tuptime", "--tsince", str(since_epoch), "--tuntil", str(until_epoch), "-l", "-s"]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            return []
-        
-        intervals = []
-        lines = res.stdout.strip().split('\n')
-        current_startup = None
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            if line.startswith("Startup:"):
-                parts = line.split()
-                if "at" in parts:
-                    idx = parts.index("at")
-                    if idx + 1 < len(parts):
-                        current_startup = int(parts[idx + 1])
-                else:
-                    current_startup = since_epoch
-            elif line.startswith("Uptime:"):
-                parts = line.split()
-                if len(parts) >= 2 and current_startup is not None:
-                    uptime = int(parts[1])
-                    intervals.append((current_startup, current_startup + uptime))
-                current_startup = None
-                
-        return intervals
-    except Exception:
-        return []
-
-def get_lock_intervals(since_epoch, until_epoch, system_intervals):
-    log_path = "/home/ldzbeta/.local/state/sys-stats-lock.log"
-    if not os.path.exists(log_path):
-        return 0
-        
-    events = []
-    try:
-        with open(log_path, "r") as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) == 2:
-                    try:
-                        ts = int(parts[0])
-                        evt = parts[1].lower()
-                        if evt in ('lock', 'unlock'):
-                            events.append((ts, evt))
-                    except ValueError:
-                        continue
-    except Exception:
-        return 0
-        
-    if not events:
-        return 0
-        
-    events.sort(key=lambda x: x[0])
-    total_locked_seconds = 0
-    
-    for sys_start, sys_end in system_intervals:
-        sys_events = [e for e in events if sys_start <= e[0] <= sys_end]
-        is_locked = False
-        lock_start = None
-        
-        for ts, evt in sys_events:
-            if evt == 'lock':
-                if not is_locked:
-                    is_locked = True
-                    lock_start = ts
-            elif evt == 'unlock':
-                if is_locked:
-                    t_start = max(lock_start, since_epoch)
-                    t_end = min(ts, until_epoch)
-                    if t_start < t_end:
-                        total_locked_seconds += (t_end - t_start)
-                    is_locked = False
-                    lock_start = None
-                    
-        if is_locked and lock_start is not None:
-            t_start = max(lock_start, since_epoch)
-            t_end = min(sys_end, until_epoch)
-            if t_start < t_end:
-                total_locked_seconds += (t_end - t_start)
-                
-    return total_locked_seconds
-
-def get_suspended_seconds(since_epoch, until_epoch):
-    """Return total seconds the system was suspended (lid closed/sleeping) in the given window.
-    Reads 'suspend' and 'resume' events from the lock log.
-    Suspended time is excluded from both active and locked stats — it drains no battery."""
-    log_path = "/home/ldzbeta/.local/state/sys-stats-lock.log"
-    if not os.path.exists(log_path):
-        return 0
-
-    events = []
-    try:
-        with open(log_path, "r") as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) == 2:
-                    try:
-                        ts = int(parts[0])
-                        evt = parts[1].lower()
-                        if evt in ('suspend', 'resume'):
-                            events.append((ts, evt))
-                    except ValueError:
-                        continue
-    except Exception:
-        return 0
-
-    if not events:
-        return 0
-
-    events.sort(key=lambda x: x[0])
-    total_suspended = 0
-    suspend_start = None
-
-    for ts, evt in events:
-        if evt == 'suspend':
-            if suspend_start is None:
-                suspend_start = ts
-        elif evt == 'resume':
-            if suspend_start is not None:
-                t_start = max(suspend_start, since_epoch)
-                t_end = min(ts, until_epoch)
-                if t_start < t_end:
-                    total_suspended += (t_end - t_start)
-                suspend_start = None
-
-    # If currently suspended (e.g. this query runs right after sleep), count up to now
-    if suspend_start is not None:
-        t_start = max(suspend_start, since_epoch)
-        t_end = min(int(datetime.now().timestamp()), until_epoch)
-        if t_start < t_end:
-            total_suspended += (t_end - t_start)
-
-    return total_suspended
-
-def make_compact_bar(val, max_val, max_len=8, color="bright_green"):
-    if max_val <= 0:
-        pct = 0.0
-    else:
-        pct = min(1.0, max(0.0, val / max_val))
+def make_bar(val, max_val, max_len=10, color="bright_green"):
+    pct = min(1.0, max(0.0, val / max_val)) if max_val > 0 else 0.0
     filled = int(round(pct * max_len))
-    bar = "█" * filled + "░" * (max_len - filled)
-    return f"[{color}]{bar}[/{color}] {pct*100:4.1f}%"
+    bar = "\u2588" * filled + "\u2591" * (max_len - filled)
+    return f"[{color}]{bar}[/{color}] {pct * 100:5.1f}%"
 
-def get_weekly_usage():
-    today = datetime.now().date()
-    weekly_entries = []
-    
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        s_dt = datetime(day.year, day.month, day.day, 0, 0, 0)
-        e_dt = datetime(day.year, day.month, day.day, 23, 59, 59)
-        s_epoch = int(s_dt.timestamp())
-        e_epoch = int(e_dt.timestamp())
-        
-        intervals = get_system_intervals(s_epoch, e_epoch)
-        total_up = sum(e - s for s, e in intervals)
-        suspended_sec = get_suspended_seconds(s_epoch, e_epoch)
-        # Subtract suspended time — sleep doesn't count as active or locked usage
-        awake_up = max(0, total_up - suspended_sec)
-        locked_sec = get_lock_intervals(s_epoch, e_epoch, intervals)
-        # Locked time can't exceed awake uptime
-        locked_sec = min(locked_sec, awake_up)
-        active_sec = max(0, awake_up - locked_sec)
-        
-        weekly_entries.append({
-            "date": day,
-            "total_up": awake_up,
-            "active_sec": active_sec,
-            "locked_sec": locked_sec
-        })
-        
-    return weekly_entries
+def format_datetime_pretty(dt_str, include_time=True):
+    if not dt_str:
+        return ""
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            dt = datetime.strptime(dt_str.strip(), fmt)
+            if include_time:
+                return dt.strftime("%b %d, %Y %I:%M %p")
+            return dt.strftime("%b %d, %Y")
+        except Exception:
+            continue
+    return dt_str.strip()
 
-def render_btop_ui(interface, net_stats, tuptime_lifetime, tuptime_period, weekly_entries):
+def format_since(dt_str):
+    """Compact a tuptime date string; handles 12h and 24h formats."""
+    for fmt in ("%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(dt_str.strip(), fmt)
+            if dt.date() == datetime.now().date():
+                return dt.strftime("%I:%M %p")
+            return dt.strftime("%b %d, %I:%M %p")
+        except Exception:
+            continue
+    return dt_str
+
+def render_rich(interface, net, tup, week):
     console = Console()
-    
-    # 1. Header
-    header_text = Text()
-    header_text.append(" 󰌢 ", style="bold bright_green")
-    header_text.append("SYSTEM USAGE & NETWORK DASHBOARD", style="bold white")
-    header_text.append(f"  │  {interface}", style="dim white")
-    header_text.append(f"  │  {datetime.now().strftime('%b %d, %I:%M %p')}", style="dim white")
 
-    console.print(Panel(header_text, box=box.ROUNDED, border_style="bright_green", padding=(0, 1)))
+    header = Text()
+    header.append(" SYSTEM USAGE & NETWORK DASHBOARD", style="bold white")
+    header.append(f"  |  {interface}", style="dim white")
+    header.append(f"  |  {datetime.now().strftime('%b %d, %I:%M %p')}", style="dim white")
+    console.print(Panel(header, box=box.ROUNDED, border_style="bright_green", padding=(0, 1)))
 
-    # 2. Network Table (ONLY Total Usage - 2 Columns)
-    net_table = Table(box=box.ROUNDED, show_header=True, header_style="bold bright_cyan", border_style="cyan", expand=True)
+    # -- network traffic summary ------------------------------------------
+    net_table = Table(box=box.ROUNDED, show_header=True, header_style="bold bright_cyan",
+                      border_style="cyan", expand=True)
     net_table.add_column("Network Period", style="bold white")
     net_table.add_column("Total Traffic", style="bold green", justify="right")
+    net_table.add_row("Today's Usage", f"[bold yellow]{format_bytes(net['today'])}[/bold yellow]")
+    net_table.add_row("This Month's Usage", f"[bold green]{format_bytes(net['month'])}[/bold green]")
+    net_table.add_row("Highest Ever Daily", f"[bold bright_cyan]{format_bytes(net['highest'])}[/bold bright_cyan]")
+    console.print(Panel(net_table, title="[bold bright_cyan] Network Traffic Summary [/bold bright_cyan]",
+                        box=box.ROUNDED, border_style="cyan"))
 
-    if isinstance(net_stats, dict):
-        net_table.add_row("󰅐 Today's Usage", f"[bold yellow]{format_bytes(net_stats['today'])}[/bold yellow]")
-        net_table.add_row("󰸗 This Month's Usage", f"[bold green]{format_bytes(net_stats['month'])}[/bold green]")
-        net_table.add_row("󰓅 Highest Ever Daily", f"[bold bright_cyan]{format_bytes(net_stats['highest'])}[/bold bright_cyan]")
-    else:
-        net_table.add_row("Status", f"[bold red]{net_stats}[/bold red]")
+    # -- weekly usage ------------------------------------------------------
+    week_table = Table(box=box.SIMPLE_HEAD, show_header=True,
+                       header_style="bold bright_green", border_style="dim green", expand=True)
+    week_table.add_column("Date", style="bold white")
+    week_table.add_column("Active Hours", style="bold bright_green")
+    week_table.add_column("Uptime", style="bright_green", justify="right")
+    week_table.add_column("Locked", style="yellow", justify="right")
 
-    console.print(Panel(net_table, title="[bold bright_cyan] Network Traffic Summary [/bold bright_cyan]", box=box.ROUNDED, border_style="cyan"))
+    for entry in week:
+        d_str = entry["date"].strftime("%b %d (%a)")
+        bar = make_bar(entry["active"], 24 * 3600, max_len=10)
+        week_table.add_row(
+            d_str,
+            f"{bar} {fmt_hm(entry['active'])}",
+            fmt_hm(entry["awake"]),
+            fmt_hm(entry["locked"]),
+        )
+    console.print(Panel(week_table,
+                        title="[bold bright_green] This Week System Usage & Active Hours [/bold bright_green]",
+                        box=box.ROUNDED, border_style="bright_green"))
 
-    # 3. Responsive Weekly Usage Chart
-    if weekly_entries:
-        week_table = Table(box=box.SIMPLE_HEAD, show_header=True, header_style="bold bright_green", border_style="dim green", expand=True)
-        week_table.add_column("Date", style="bold white")
-        week_table.add_column("Active Hours", style="bold bright_green")
-        week_table.add_column("Uptime", style="bright_green", justify="right")
-        week_table.add_column("Locked", style="yellow", justify="right")
-
-        for entry in weekly_entries:
-            d_str = entry["date"].strftime("%b %d (%a)")
-            act_sec = entry["active_sec"]
-            bar = make_compact_bar(act_sec, 24 * 3600, max_len=8, color="bright_green")
-            
-            h = act_sec // 3600
-            m = (act_sec % 3600) // 60
-            up_h = entry["total_up"] // 3600
-            up_m = (entry["total_up"] % 3600) // 60
-            loc_h = entry["locked_sec"] // 3600
-            loc_m = (entry["locked_sec"] % 3600) // 60
-
-            week_table.add_row(
-                d_str,
-                f"{bar} {h}h {m:02d}m",
-                f"{up_h}h {up_m:02d}m",
-                f"{loc_h}h {loc_m:02d}m" if loc_h > 0 else f"{loc_m}m"
-            )
-
-        console.print(Panel(week_table, title="[bold bright_green] 󰨖 This Week System Usage & Active Hours [/bold bright_green]", box=box.ROUNDED, border_style="bright_green"))
-
-    # 4. System Analytics Bottom Box (Minimal 2 Columns: Metric & Value/Duration)
-    sys_table = Table(box=box.ROUNDED, show_header=True, header_style="bold yellow", border_style="yellow", expand=True)
-    sys_table.add_column("System Metric", style="bold white")
+    # -- session analytics -------------------------------------------------
+    sys_table = Table(box=box.ROUNDED, show_header=True, header_style="bold yellow",
+                      border_style="yellow", expand=True)
+    sys_table.add_column("System Metric", style="bold white", no_wrap=True)
     sys_table.add_column("Value / Duration", style="bold green", justify="right")
 
-    if "current_duration" in tuptime_lifetime:
-        curr_dur = tuptime_lifetime["current_duration"]
-        curr_dt = format_short_dt(tuptime_lifetime.get("current_date", ""))
-        sys_table.add_row("󱎫 Current Session", f"{curr_dur} (Started {curr_dt})")
+    if week:
+        peak = max(week, key=lambda x: x["active"])
+        if peak["active"] > 0:
+            sys_table.add_row("Best Day (Active / Uptime)",
+                              f"{fmt_hm(peak['active'])} active / {fmt_hm(peak['awake'])} uptime "
+                              f"({peak['date'].strftime('%b %d')})")
 
-    if weekly_entries:
-        today_entry = weekly_entries[-1]
-        t_act_h = today_entry["active_sec"] // 3600
-        t_act_m = (today_entry["active_sec"] % 3600) // 60
-        t_up_h = today_entry["total_up"] // 3600
-        t_up_m = (today_entry["total_up"] % 3600) // 60
-        sys_table.add_row("󰔟 Today's Active / Uptime", f"{t_act_h}h {t_act_m:02d}m active / {t_up_h}h {t_up_m:02d}m uptime")
+    if "system_uptime" in tup:
+        sys_table.add_row("Lifetime System Uptime", tup["system_uptime"])
 
-    if "longest_duration" in tuptime_period:
-        p_dur = tuptime_period["longest_duration"]
-        p_dt = format_short_dt(tuptime_period.get("longest_date", ""))
-        sys_table.add_row("󰨖 Longest Session Per Day", f"{p_dur} ({p_dt})")
+    if "system_life" in tup or "startups_since" in tup:
+        since_str = format_datetime_pretty(tup.get("startups_since", ""), include_time=False)
+        life_str = tup.get("system_life", "")
+        if life_str and since_str:
+            sys_table.add_row("Lifetime System Life", f"{life_str} (since {since_str})")
+        elif life_str:
+            sys_table.add_row("Lifetime System Life", life_str)
+        elif since_str:
+            sys_table.add_row("Lifetime Tracking Since", since_str)
 
-    if "longest_duration" in tuptime_lifetime:
-        long_dur = tuptime_lifetime["longest_duration"]
-        long_dt = format_short_dt(tuptime_lifetime.get("longest_date", ""))
-        sys_table.add_row("󰓅 Longest Session Ever", f"[bold bright_magenta]{long_dur}[/bold bright_magenta] ({long_dt})")
+    console.print(Panel(sys_table, title="[bold yellow] System Session Analytics [/bold yellow]",
+                        box=box.ROUNDED, border_style="yellow"))
 
-    if "system_uptime" in tuptime_lifetime:
-        sys_table.add_row("󰌢 Lifetime System Uptime", tuptime_lifetime["system_uptime"])
+def render_plain(interface, net, tup, week):
+    print("=" * 70)
+    print(" SYSTEM USAGE & NETWORK DASHBOARD".ljust(50) +
+          f"{interface} | {datetime.now().strftime('%b %d, %I:%M %p')}")
+    print("=" * 70)
 
-    console.print(Panel(sys_table, title="[bold yellow] 󰔟 System Session Analytics [/bold yellow]", box=box.ROUNDED, border_style="yellow"))
+    print("\n[+] Network Traffic Summary")
+    print(f"    Today's Usage:         {format_bytes(net['today'])}")
+    print(f"    This Month's Usage:    {format_bytes(net['month'])}")
+    print(f"    Highest Ever Daily:    {format_bytes(net['highest'])}")
 
-def render_plain_ui(interface, net_stats, tuptime_lifetime, tuptime_period):
-    print("=" * 65)
-    print("       SYSTEM USAGE & NETWORK DASHBOARD")
-    print("=" * 65)
-    
-    print(f"\n[+] Network Usage (Interface: {interface})")
-    if isinstance(net_stats, dict):
-        print(f"  - Today's Usage:         {format_bytes(net_stats['today'])}")
-        print(f"  - This Month's Usage:    {format_bytes(net_stats['month'])}")
-        print(f"  - Highest Ever Daily:    {format_bytes(net_stats['highest'])}")
-    else:
-        print(f"  [-] Network statistics query failed: {net_stats}")
-        
-    print(f"\n[+] System Session Analytics")
-    if "current_duration" in tuptime_lifetime:
-        print(f"  - Current Uptime Session:  {tuptime_lifetime['current_duration']} (Started {format_short_dt(tuptime_lifetime.get('current_date', ''))})")
-    if "longest_duration" in tuptime_lifetime:
-        print(f"  - Longest Session Ever:    {tuptime_lifetime['longest_duration']} (Started {format_short_dt(tuptime_lifetime.get('longest_date', ''))})")
-    if "average" in tuptime_lifetime:
-        print(f"  - Average Session Length:  {tuptime_lifetime['average']}")
+    print("\n[+] This Week System Usage & Active Hours")
+    print(f"    {'Date':<13}{'Active':>9}  {'Uptime':>8}  {'Locked':>8}   Bar")
+    for entry in week:
+        pct = entry["active"] / 86400 * 100 if entry["active"] else 0.0
+        filled = int(round(pct / 100 * 10))
+        bar = "#" * filled + "." * (10 - filled)
+        print(f"    {entry['date'].strftime('%b %d (%a)'):<13}"
+              f"{fmt_hm(entry['active']):>9}  {fmt_hm(entry['awake']):>8}  "
+              f"{fmt_hm(entry['locked']):>8}   [{bar} {pct:4.1f}%]")
+
+    print("\n[+] System Session Analytics")
+    if week:
+        peak = max(week, key=lambda x: x["active"])
+        if peak["active"] > 0:
+            print(f"    Best Day (Active / Uptime):  {fmt_hm(peak['active'])} active / "
+                  f"{fmt_hm(peak['awake'])} uptime ({peak['date'].strftime('%b %d')})")
+    if "system_uptime" in tup:
+        print(f"    Lifetime System Uptime:      {tup['system_uptime']}")
+    if "system_life" in tup or "startups_since" in tup:
+        since_str = format_datetime_pretty(tup.get("startups_since", ""), include_time=False)
+        life_str = tup.get("system_life", "")
+        if life_str and since_str:
+            print(f"    Lifetime System Life:        {life_str} (since {since_str})")
+        elif life_str:
+            print(f"    Lifetime System Life:        {life_str}")
+        elif since_str:
+            print(f"    Lifetime Tracking Since:     {since_str}")
+    print()
+
+# ---------------------------------------------------------------- main
 
 def main():
     parser = argparse.ArgumentParser(
-        description="System Network Usage & System Uptime Analytics Dashboard (btop++ TUI).",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="System Usage & Network Dashboard with persistent history.",
         epilog="""Examples:
-  %(prog)s                               # Run btop++ TUI dashboard
-  %(prog)s --plain                       # Output in plain text format
-  %(prog)s -i wlan0                      # Specify network interface
-"""
-    )
-    parser.add_argument("-s", "--start", default="7d", help="Start date. Default: 7d")
-    parser.add_argument("-e", "--end", default="today", help="End date. Default: today")
-    parser.add_argument("-i", "--interface", help="Network interface. Auto-detected if omitted.")
-    parser.add_argument("--plain", action="store_true", help="Output plain text instead of btop++ TUI dashboard.")
-    
+  %(prog)s                  # dashboard (rich UI if available)
+  %(prog)s --plain          # plain text output
+  %(prog)s -i wlan0         # pin a network interface
+  %(prog)s --reset-history  # wipe recorded history and start over
+""")
+    parser.add_argument("-i", "--interface", help="network interface (auto-detected)")
+    parser.add_argument("--plain", action="store_true", help="plain text output")
+    parser.add_argument("--reset-history", action="store_true",
+                        help="delete recorded history and exit")
     args = parser.parse_args()
-    
-    missing = check_dependencies()
-    if missing:
-        print("[-] Missing required system packages:", ", ".join(missing), file=sys.stderr)
-        sys.exit(1)
-        
+
+    if args.reset_history:
+        try:
+            os.remove(history_path())
+            print(f"[-] history removed: {history_path()}")
+        except FileNotFoundError:
+            print("[+] no history file present")
+        return
+
+    hist = load_history()
+
+    # interface: CLI > default route > first vnstat-tracked
     interface = args.interface
     if not interface:
-        interface = get_default_interface()
-        tracked = get_vnstat_interfaces()
-        if interface and interface not in tracked:
-            if tracked:
-                interface = tracked[0]
-        elif not interface and tracked:
+        interface = default_interface()
+        tracked = vnstat_interfaces()
+        if tracked and interface not in tracked:
+            interface = tracked[0] if not interface else interface
+        if not interface and tracked:
             interface = tracked[0]
-            
     if not interface:
-        print("[-] Error: No network interfaces detected or tracked by vnstat.", file=sys.stderr)
+        print("[-] No network interface detected.", file=sys.stderr)
         sys.exit(1)
-        
-    net_stats = get_vnstat_totals(interface)
-    
-    lifetime_tuptime_out = subprocess.run(["tuptime"], capture_output=True, text=True).stdout
-    tuptime_lifetime = parse_tuptime_regex(lifetime_tuptime_out)
-    
-    tuptime_period = {}
+
+    # record live counter deltas FIRST so today's number includes the very
+    # latest traffic even when vnstat has not flushed yet
+    counters = read_live_counters(interface)
+    if counters:
+        record_counter_delta(hist, interface, *counters)
+
+    net = network_stats(interface, hist)
+
+    # one tuptime call for the whole week window (fast + consistent), plus a
+    # wide-window query used ONLY for capping event spans at boot boundaries.
+    now = datetime.now()
+    now_ts = int(now.timestamp())
+    week_start = int(datetime.combine(now.date() - timedelta(days=6), dtime.min).timestamp())
+    week_end = int(datetime.combine(now.date(), dtime.max).timestamp())
+    intervals = tuptime_intervals(week_start, week_end)
+    if intervals is None:
+        # tuptime unavailable: approximate with current boot only
+        boot = boot_epoch()
+        intervals = [(boot, week_end)] if boot < week_end else []
+
+    events = load_events()
+
+    # Extend the ongoing boot to "now": tuptime's last Uptime value is sampled
+    # at query time and lags by seconds/minutes, which would otherwise leave a
+    # gap of missing uptime at the end of today.
     try:
-        from_d = datetime.now().date() - timedelta(days=7)
-        s_epoch = int(datetime(from_d.year, from_d.month, from_d.day, 0, 0, 0).timestamp())
-        e_epoch = int(datetime.now().timestamp())
-        period_out = subprocess.run(["tuptime", "--tsince", str(s_epoch), "--tuntil", str(e_epoch)], capture_output=True, text=True).stdout
-        tuptime_period = parse_tuptime_regex(period_out)
+        boot = boot_epoch()
+        if boot <= now_ts:
+            for idx in range(len(intervals) - 1, -1, -1):
+                b_s, b_e = intervals[idx]
+                if b_s - 120 <= boot <= b_e + 3600:
+                    if b_e < now_ts:
+                        intervals[idx] = (b_s, now_ts)
+                    break
+            else:
+                if boot < week_end and not any(s <= boot <= e for s, e in intervals):
+                    intervals.append((boot, now_ts))
+                    intervals.sort()
     except Exception:
         pass
-        
-    weekly_entries = get_weekly_usage()
 
-    if args.plain or not RICH_AVAILABLE:
-        render_plain_ui(interface, net_stats, tuptime_lifetime, tuptime_period)
+    # Full-history sessions for span capping: a suspend/lock from before the
+    # week must still resolve to its own boot session so it gets capped there
+    # instead of leaking into this week uncapped.  Query from the first logged
+    # event (or week start, whichever is earlier) to now.
+    cap_sessions = intervals
+    try:
+        cap_since = week_start
+        if events:
+            cap_since = min(cap_since, max(0, events[0][0] - 60))
+        wide = tuptime_intervals(cap_since, week_end)
+        if wide:
+            # Merge week intervals in case the wide query missed the live tail.
+            merged = {(s, e) for s, e in wide} | {(s, e) for s, e in intervals}
+            cap_sessions = sorted(merged)
+    except Exception:
+        pass
+
+    # Authoritative sleep from the journal (survives missed lock-log hooks),
+    # unioned with lock-log pairs inside suspended_in/locked_in.
+    try:
+        journal_spans = journal_sleep_spans(week_start, week_end,
+                                            cap_sessions)
+    except Exception:
+        journal_spans = []
+
+    week = weekly_entries(intervals, events, cap_sessions=cap_sessions,
+                          journal_spans=journal_spans)
+
+    tup = tuptime_summary() if which("tuptime") else {}
+
+    save_history(hist)
+
+    if args.plain or not RICH_AVAILABLE or not sys.stdout.isatty():
+        render_plain(interface, net, tup, week)
     else:
-        render_btop_ui(interface, net_stats, tuptime_lifetime, tuptime_period, weekly_entries)
+        render_rich(interface, net, tup, week)
 
 if __name__ == "__main__":
     main()

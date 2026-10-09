@@ -23,6 +23,17 @@
       "daily": true
     },
     {
+      "id": 1783741462656,
+      "text": "tafsir",
+      "completed": false,
+      "completedAt": "",
+      "createdAt": "2026-07-11T03:44:22.656Z",
+      "pageId": 0,
+      "priority": "medium",
+      "details": "2:215\n",
+      "daily": true
+    },
+    {
       "id": 1781355627388,
       "text": "quran",
       "completed": false,
@@ -31,17 +42,6 @@
       "pageId": 0,
       "priority": "low",
       "details": "",
-      "daily": true
-    },
-    {
-      "id": 1783741462656,
-      "text": "tafsir",
-      "completed": true,
-      "completedAt": "2026-08-15T05:19:13.839Z",
-      "createdAt": "2026-07-11T03:44:22.656Z",
-      "pageId": 0,
-      "priority": "medium",
-      "details": "2:190",
       "daily": true
     }
   ],
@@ -53,10 +53,10 @@
   ],
   "current_page_id": 0,
   "count": 4,
-  "completedCount": 1,
+  "completedCount": 2,
   "showCompleted": true,
   "showBackground": true,
-  "isExpanded": true,
+  "isExpanded": false,
   "useCustomColors": false,
   "priorityColors": {
     "high": "#f44336",

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# show-keybinds — native Super+/ replacement (no quickshell dependency)
+# Parses Hyprland keybinds + noctalia manual/user JSON and shows searchable overlay via fuzzel.
+set -euo pipefail
+
+PARSER="$HOME/.config/quickshell/keybinds-viewer/parse_keybinds.py"
+
+format_list() {
+    python3 "$PARSER" 2>/dev/null | python3 <<'PY'
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for section in data:
+    print("--- " + section.get("section", "") + " ---")
+    for b in section.get("binds", []):
+        keys = (b.get("keys") or "").strip()
+        desc = (b.get("desc") or "").strip()
+        print(keys + "  |  " + desc)
+PY
+}
+
+# Prefer fuzzel (already installed, wayland-native). Fallback to kitty+less.
+if command -v fuzzel >/dev/null 2>&1; then
+    format_list | fuzzel --dmenu --prompt "Keybinds > " --width 90 --lines 25 --placeholder "Type to search... (Esc to close)"
+else
+    format_list | kitty --title "Keybinds (Super+/)" --hold sh -c "column -t -s '|' | less -S -R"
+fi

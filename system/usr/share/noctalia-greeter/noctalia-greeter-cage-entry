@@ -1,0 +1,4 @@
+#!/usr/bin/sh
+set -eu
+
+exec "${GREETER_BIN:?GREETER_BIN not set}" "$@"

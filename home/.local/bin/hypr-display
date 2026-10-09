@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# hypr-display — Hyprland display mode switcher
+# Monitors: eDP-1 (laptop 1920x1200@60) | HDMI-A-1 (external 1920x1080@60)
+#
+# IMPORTANT: This script NEVER starts or kills Noctalia/qs.
+# It only updates settings.json and sends an IPC reload signal.
+
+LAPTOP="eDP-1"
+HDMI="HDMI-A-1"
+LAPTOP_RES="1920x1200@60"
+HDMI_RES="1920x1080@60"
+LAPTOP_SCALE="1.25"
+HDMI_SCALE="1.0"
+NOCTALIA_SETTINGS="$HOME/.config/noctalia/settings.json"
+
+notify() {
+    notify-send -i display "Display Manager" "$1" -t 3000
+}
+
+# Only update bar monitors in settings.json — let Noctalia hot-reload itself
+set_bar_monitors() {
+    local monitors_json="$1"
+    python3 -c "
+import json, sys
+with open('$NOCTALIA_SETTINGS', 'r') as f:
+    data = json.load(f)
+data['bar']['monitors'] = json.loads(sys.argv[1])
+with open('$NOCTALIA_SETTINGS', 'w') as f:
+    json.dump(data, f, indent=4, ensure_ascii=False)
+" "$monitors_json" 2>/dev/null
+
+    # Send reload via qs IPC — works for v4; v5 hot-reloads on its own
+    qs -c noctalia-shell ipc call settings reload 2>/dev/null || true
+}
+
+move_all_to_monitor() {
+    local target="$1"
+    local workspaces
+    workspaces=$(hyprctl workspaces -j 2>/dev/null | python3 -c "
+import json,sys
+for w in json.load(sys.stdin): print(w['id'])
+" 2>/dev/null)
+    for ws in $workspaces; do
+        hyprctl dispatch moveworkspacetomonitor "$ws" "$target" 2>/dev/null
+    done
+    sleep 0.3
+}
+
+mode_laptop_only() {
+    notify "Switching to Laptop Only..."
+    hyprctl keyword monitor "$LAPTOP, $LAPTOP_RES, 0x0, $LAPTOP_SCALE"
+    sleep 0.3
+    move_all_to_monitor "$LAPTOP"
+    hyprctl keyword monitor "$HDMI, disable"
+    set_bar_monitors '["eDP-1"]'
+    notify "✅ Laptop Only"
+}
+
+mode_hdmi_only() {
+    notify "Switching to External Monitor Only..."
+    hyprctl keyword monitor "$HDMI, $HDMI_RES, 0x0, $HDMI_SCALE"
+    sleep 0.4
+    move_all_to_monitor "$HDMI"
+    hyprctl keyword monitor "$LAPTOP, disable"
+    set_bar_monitors '["HDMI-A-1"]'
+    notify "✅ External Monitor Only (HDMI)"
+}
+
+mode_extend() {
+    notify "Switching to Extended Display..."
+    hyprctl keyword monitor "$LAPTOP, $LAPTOP_RES, 0x0, $LAPTOP_SCALE"
+    hyprctl keyword monitor "$HDMI, $HDMI_RES, 1536x0, $HDMI_SCALE"
+    set_bar_monitors '["eDP-1","HDMI-A-1"]'
+    notify "✅ Extended — Laptop left, HDMI right"
+}
+
+mode_extend_reverse() {
+    notify "Switching to Extended Display (HDMI left)..."
+    hyprctl keyword monitor "$HDMI, $HDMI_RES, 0x0, $HDMI_SCALE"
+    hyprctl keyword monitor "$LAPTOP, $LAPTOP_RES, 1920x0, $LAPTOP_SCALE"
+    set_bar_monitors '["eDP-1","HDMI-A-1"]'
+    notify "✅ Extended — HDMI left, Laptop right"
+}
+
+mode_mirror() {
+    notify "Switching to Mirror Mode..."
+    hyprctl keyword monitor "$LAPTOP, $LAPTOP_RES, 0x0, $LAPTOP_SCALE"
+    sleep 0.3
+    hyprctl keyword monitor "$HDMI, $HDMI_RES, 0x0, $HDMI_SCALE, mirror, $LAPTOP"
+    set_bar_monitors '["eDP-1","HDMI-A-1"]'
+    notify "✅ Mirror — HDMI mirrors Laptop"
+}
+
+show_gui() {
+    local laptop_st hdmi_st
+    laptop_st=$(hyprctl monitors all -j 2>/dev/null | python3 -c "
+import json,sys
+for m in json.load(sys.stdin):
+    if m['name']=='eDP-1': print('disabled' if m['disabled'] else 'active')
+" 2>/dev/null || echo "?")
+    hdmi_st=$(hyprctl monitors all -j 2>/dev/null | python3 -c "
+import json,sys
+for m in json.load(sys.stdin):
+    if m['name']=='HDMI-A-1': print('disabled' if m['disabled'] else ('mirror' if m['mirrorOf']!='none' else 'active'))
+" 2>/dev/null || echo "?")
+
+    local choice
+    choice=$(yad \
+        --title="Display Manager" \
+        --text="<b>🖥 Display Mode Switcher</b>\n\nLaptop (eDP-1): <b>$laptop_st</b>   HDMI (HDMI-A-1): <b>$hdmi_st</b>\n\nSelect a mode:" \
+        --list \
+        --column="Mode" \
+        --column="Description" \
+        --no-headers \
+        --width=480 \
+        --height=280 \
+        --center \
+        --button="Apply:0" \
+        --button="Cancel:1" \
+        "laptop"   "💻 Laptop Only — use only the laptop screen" \
+        "hdmi"     "🖥 HDMI Only — use only the external monitor" \
+        "extend"   "⟺ Extend (Laptop left, HDMI right)" \
+        "extend-r" "⟺ Extend (HDMI left, Laptop right)" \
+        "mirror"   "🪞 Mirror — HDMI mirrors Laptop" \
+        2>/dev/null)
+
+    [[ $? -ne 0 ]] && exit 0
+
+    local mode
+    mode=$(echo "$choice" | cut -d'|' -f1 | xargs)
+    case "$mode" in
+        laptop)   mode_laptop_only ;;
+        hdmi)     mode_hdmi_only ;;
+        extend)   mode_extend ;;
+        extend-r) mode_extend_reverse ;;
+        mirror)   mode_mirror ;;
+    esac
+}
+
+case "${1:-gui}" in
+    laptop)   mode_laptop_only ;;
+    hdmi)     mode_hdmi_only ;;
+    extend)   mode_extend ;;
+    extend-r) mode_extend_reverse ;;
+    mirror)   mode_mirror ;;
+    gui|*)    show_gui ;;
+esac

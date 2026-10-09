@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+#  Noctalia v5 · Professional Session Launcher
+#  Zero-gap boot: TTY1 autologin → Hyprland → Noctalia → native lock screen
+# ─────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+export NOCTALIA_SESSION=v5
+export NOCTALIA_VERSION=5
+
+STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/noctalia-active-version"
+LOG_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/noctalia-boot.log"
+MAX_LOG_SIZE=1048576
+
+mkdir -p "$(dirname "$STATE_FILE")"
+
+if [[ -f "$LOG_FILE" ]] && [[ "$(stat -c%s "$LOG_FILE" 2>/dev/null || echo 0)" -gt $MAX_LOG_SIZE ]]; then
+    mv "$LOG_FILE" "$LOG_FILE.old"
+fi
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+log "════════════════════════════════════════════"
+log "Noctalia v5 boot sequence initiated"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+echo "v5" > "$STATE_FILE"
+log "State: v5 (PID $$)"
+
+renice -n -8 $$ 2>/dev/null || true
+log "Priority: boosted"
+
+for file in \
+    "$HOME/.config/hypr/hyprland.conf" \
+    "$HOME/.config/hypr/noctalia/noctalia-colors.conf" \
+    "$HOME/.config/hypr/noctalia/noctalia-overrides.conf" \
+    "$HOME/.config/hypr/configs/autostart.conf" \
+    "$HOME/.config/noctalia/config.toml" \
+    "$HOME/.config/noctalia/settings.json" \
+    "$HOME/.config/noctalia/colors.json"; do
+    cat "$file" >/dev/null 2>&1 || true
+done
+log "Page cache: warmed"
+
+log "Launching Hyprland"
+log "════════════════════════════════════════════"
+exec /usr/bin/start-hyprland

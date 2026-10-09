@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Noctalia Session Autostart Manager
+# Starts Noctalia v5.1.0 native compositor shell daemon
+
+set -euo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:$PATH"
+ulimit -S -n 1024 2>/dev/null || true
+ulimit -H -n 524288 2>/dev/null || true
+unset GBM_BACKEND
+
+exec "$HOME/.local/bin/noctalia" --daemon
