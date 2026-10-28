@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# backup-waydroid — Backup Waydroid environment config (no user data)
+# Keeps repo small — only config/LXC files backed up.
+# Usage: backup-waydroid [--dry-run]
+
+set -euo pipefail
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+WAYDROID_REPO_DIR="$REPO_ROOT/system/waydroid"
+DRYRUN=0
+[ "${1:-}" = "--dry-run" ] && DRYRUN=1
+say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
+
+say "Backing up Waydroid environment (no user data) to $WAYDROID_REPO_DIR..."
+mkdir -p "$WAYDROID_REPO_DIR/lib/waydroid" "$WAYDROID_REPO_DIR/lxc/waydroid"
+cp -a /var/lib/waydroid/waydroid.cfg "$WAYDROID_REPO_DIR/lib/waydroid/"
+cp -a /var/lib/waydroid/waydroid.prop "$WAYDROID_REPO_DIR/lib/waydroid/"
+cp -a /var/lib/waydroid/waydroid_base.prop "$WAYDROID_REPO_DIR/lib/waydroid/"
+cp -a /var/lib/waydroid/lxc/waydroid/config "$WAYDROID_REPO_DIR/lxc/waydroid/"
+cp -a /var/lib/waydroid/lxc/waydroid/config_nodes "$WAYDROID_REPO_DIR/lxc/waydroid/"
+cp -a /var/lib/waydroid/lxc/waydroid/config_session "$WAYDROID_REPO_DIR/lxc/waydroid/"
+cp -a /var/lib/waydroid/lxc/waydroid/waydroid.seccomp "$WAYDROID_REPO_DIR/lxc/waydroid/"
+echo "Environment/config backup complete. (User data excluded per preference)"

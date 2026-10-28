@@ -256,6 +256,12 @@ sudo systemctl enable greetd.service 2>/dev/null || true
 # Optimize boot time by masking NetworkManager-wait-online.service
 sudo systemctl mask NetworkManager-wait-online.service
 
+# Waydroid
+if [ -f "$HERE/system/usr/local/bin/setup-waydroid" ]; then
+  say "Deploying Waydroid setup..."
+  sudo "$HERE/system/usr/local/bin/setup-waydroid" || warn "Waydroid setup failed; continuing."
+fi
+
 # Dual-auth PAM configurations (sudo, polkit)
 for f in sudo polkit-1; do
   if [ -f "$HERE/system/etc/pam.d/$f" ]; then
