@@ -62,3 +62,4 @@ alias cuda-test='python3 -c "import torch; print(\"CUDA available:\", torch.cuda
 alias gpu-hybrid='pkexec envycontrol --switch hybrid && echo "Set to HYBRID mode — reboot required"'
 alias gpu-nvidia='pkexec envycontrol --switch nvidia && echo "Set to NVIDIA-only mode — reboot required"'
 alias gpu-intel='pkexec envycontrol --switch integrated && echo "Set to Intel-only mode — reboot required"'
+export PATH=~/.npm-global/bin:$PATH
